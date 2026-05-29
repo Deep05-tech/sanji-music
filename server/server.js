@@ -60,7 +60,7 @@ function setupYtDlpUpdate() {
 
   console.log("[YT-DLP] Checking/downloading latest Linux binary in background...");
   const { exec } = require("child_process");
-  const url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
+  const url = "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp";
   
   exec(`wget -q "${url}" -O "${localYtDlpPath}" && chmod +x "${localYtDlpPath}"`, (err, stdout, stderr) => {
     if (err) {
