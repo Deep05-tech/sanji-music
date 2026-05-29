@@ -31,6 +31,37 @@ function isMongo() {
   return mongoClient !== null && mongoDb !== null;
 }
 
+// Resolve all hostnames in a mongodb:// URI to IPs using Google DNS.
+// This bypasses Render's DNS issues with Atlas hostnames.
+async function resolveHostsToIps(uri) {
+  if (!uri.startsWith("mongodb://")) return uri;
+
+  const authEnd = uri.indexOf("@");
+  const afterHosts = uri.indexOf("/", authEnd > 0 ? authEnd : 8);
+  const hostsPart = uri.slice(authEnd > 0 ? authEnd + 1 : 8, afterHosts > 0 ? afterHosts : undefined);
+
+  const hosts = hostsPart.split(",");
+  const resolved = [];
+
+  dns.setServers(["8.8.8.8", "8.8.4.4"]);
+
+  for (const entry of hosts) {
+    const [hostname, port] = entry.split(":");
+    try {
+      const ips = await dns.promises.resolve4(hostname);
+      resolved.push(port ? `${ips[0]}:${port}` : ips[0]);
+      console.log(`[DB] Resolved ${hostname} -> ${ips[0]}`);
+    } catch {
+      resolved.push(entry);
+    }
+  }
+
+  let result = uri.slice(0, authEnd > 0 ? authEnd + 1 : 8);
+  result += resolved.join(",");
+  if (afterHosts > 0) result += uri.slice(afterHosts);
+  return result;
+}
+
 async function connect() {
   if (!MONGODB_URI) {
     console.log("[DB] No MONGODB_URI set, using db.json");
@@ -41,8 +72,13 @@ async function connect() {
     try { dns.setServers(["8.8.8.8", "8.8.4.4"]); } catch (_) {}
   }
 
+  let resolvedUri = MONGODB_URI;
+  if (MONGODB_URI.startsWith("mongodb://")) {
+    resolvedUri = await resolveHostsToIps(MONGODB_URI);
+  }
+
   const tryConnect = async (options = {}) => {
-    const client = new MongoClient(MONGODB_URI, options);
+    const client = new MongoClient(resolvedUri, options);
     await client.connect();
     mongoClient = client;
     mongoDb = client.db();
@@ -73,16 +109,12 @@ async function close() {
 }
 
 async function findUserByEmail(email) {
-  if (isMongo()) {
-    return await mongoDb.collection("users").findOne({ email });
-  }
+  if (isMongo()) return await mongoDb.collection("users").findOne({ email });
   return readJsonDb().users.find((u) => u.email === email) || null;
 }
 
 async function findUserById(id) {
-  if (isMongo()) {
-    return await mongoDb.collection("users").findOne({ id });
-  }
+  if (isMongo()) return await mongoDb.collection("users").findOne({ id });
   return readJsonDb().users.find((u) => u.id === id) || null;
 }
 
