@@ -475,8 +475,46 @@ app.get("/stream/:videoId", (req, res) => {
 
 
 app.get("/debug-ytdlp", (req, res) => {
+  const { videoId, client } = req.query;
+
   const localExists = fs.existsSync(localYtDlpPath);
   const localStats = localExists ? fs.statSync(localYtDlpPath) : null;
+
+  if (videoId) {
+    const spoofClient = client || "android,ios";
+    const args = [
+      `https://www.youtube.com/watch?v=${videoId}`,
+      "-f", "bestaudio",
+      "--get-url",
+      "--no-warnings",
+      "--no-playlist",
+      "--extractor-args", `youtube:player_client=${spoofClient};player_skip=webpage`,
+      "--no-check-certificate",
+    ];
+    if (fs.existsSync(COOKIES_PATH)) {
+      args.push("--cookies", COOKIES_PATH);
+    }
+
+    const ytdlp = spawn(ytDlpCmd, args);
+    let stdout = "";
+    let stderr = "";
+    ytdlp.stdout.on("data", (data) => { stdout += data.toString(); });
+    ytdlp.stderr.on("data", (data) => { stderr += data.toString(); });
+
+    ytdlp.on("close", (code) => {
+      res.json({
+        type: "stream-test",
+        videoId,
+        client: spoofClient,
+        code,
+        url: stdout.trim(),
+        stderr: stderr.trim(),
+        ytDlpCmd,
+        cookiesExists: fs.existsSync(COOKIES_PATH)
+      });
+    });
+    return;
+  }
 
   const ytdlp = spawn(ytDlpCmd, ["--version"]);
   let stdout = "";
