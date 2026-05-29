@@ -686,7 +686,11 @@ function App() {
 
   useEffect(() => {
     const query = searchQuery.trim();
-    if (!query || query.length < 2) return;
+    if (!query || query.length < 2) {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      const t = setTimeout(() => setSearchResults([]), 0);
+      return () => clearTimeout(t);
+    }
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
 
     searchTimeoutRef.current = setTimeout(async () => {
@@ -1046,20 +1050,20 @@ function App() {
                 </section>
 
                 {recentlyPlayed.length > 0 && (
-                  <Section label="Recently Served" title="Recently Played">
+                  <Section label="Recently Served" title="Recents">
                     {renderCards(recentlyPlayed.slice(0, 8), 'The kitchen is empty. Find your ingredients.')}
                   </Section>
                 )}
 
-                <Section label="Tonight's Specials" title="Featured Charts">
+                <Section label="Trending Tonight" title="Trending">
                   {renderCards(homeData.specials, 'Sharpening the knives for tonight.')}
                 </Section>
 
-                <Section label="Fresh From The Kitchen" title="New Releases">
+                <Section label="Chef's Specials" title="Picked for You">
                   {renderCards(homeData.freshKitchen, 'Fresh dishes are still on the pass.')}
                 </Section>
 
-                <Section label="Chef's Recommendation" title="Made For You">
+                <Section label="Chef's Recommendation" title="Recommended">
                   {renderCards(homeData.recommendation, 'The chef is tasting the sauce.')}
                 </Section>
               </>

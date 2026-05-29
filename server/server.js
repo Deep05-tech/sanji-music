@@ -186,7 +186,7 @@ app.get("/search", async (req, res) => {
   console.log(`[SEARCH] Searching for: "${query}"`);
 
   const args = [
-    `ytsearch5:${query}`,
+    `ytsearch12:${query}`,
     "--dump-json",
     "--flat-playlist",
     "--no-warnings",
@@ -285,24 +285,7 @@ app.get("/stream/:videoId", (req, res) => {
   });
 });
 
-  ytdlp.on("error", (err) => {
-    console.error(`[YT-DLP ERROR] ${err.message}`);
-    if (!res.headersSent) {
-      res.status(500).json({ error: "yt-dlp failed" });
-    }
-  });
 
-  ytdlp.on("close", (code) => {
-    if (code !== 0) {
-      console.error(`[YT-DLP] Process exited with code ${code}`);
-    }
-  });
-
-  req.on("close", () => {
-    console.log(`[STREAM] Client disconnected for ${videoId}`);
-    ytdlp.kill("SIGTERM");
-  });
-});
 
 app.get("/metadata/:videoId", (req, res) => {
   const { videoId } = req.params;
