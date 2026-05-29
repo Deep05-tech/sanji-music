@@ -485,14 +485,18 @@ app.get("/debug-ytdlp", (req, res) => {
     const format = req.query.format || "bestaudio/best";
     const args = [
       `https://www.youtube.com/watch?v=${videoId}`,
-      "--get-url",
       "--no-warnings",
       "--no-playlist",
       "--extractor-args", `youtube:player_client=${spoofClient};player_skip=webpage`,
       "--no-check-certificate",
     ];
-    if (format !== "none") {
-      args.push("-f", format);
+    if (format === "list") {
+      args.push("--list-formats");
+    } else {
+      args.push("--get-url");
+      if (format !== "none") {
+        args.push("-f", format);
+      }
     }
     if (fs.existsSync(COOKIES_PATH) && req.query.nocookies !== "true") {
       args.push("--cookies", COOKIES_PATH);
