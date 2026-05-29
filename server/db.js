@@ -1,7 +1,6 @@
 const { MongoClient } = require("mongodb");
 const path = require("path");
 const fs = require("fs");
-const dns = require("dns");
 
 const DATA_DIR = path.join(__dirname, "data");
 const DB_PATH = path.join(DATA_DIR, "db.json");
@@ -31,8 +30,19 @@ function isMongo() {
   return mongoClient !== null && mongoDb !== null;
 }
 
-// Resolve all hostnames in a mongodb:// URI to IPs using Google DNS.
+// Resolve hostnames to IPs using Google DNS-over-HTTPS (port 443).
 // This bypasses Render's DNS issues with Atlas hostnames.
+async function dnsResolve(hostname) {
+  const url = `https://dns.google/resolve?name=${encodeURIComponent(hostname)}&type=A`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.Status === 0 && data.Answer) {
+    const ip = data.Answer.find((a) => a.type === 1)?.data;
+    if (ip) return ip;
+  }
+  throw new Error(`DNS resolution failed for ${hostname}`);
+}
+
 async function resolveHostsToIps(uri) {
   if (!uri.startsWith("mongodb://")) return uri;
 
@@ -43,15 +53,14 @@ async function resolveHostsToIps(uri) {
   const hosts = hostsPart.split(",");
   const resolved = [];
 
-  dns.setServers(["8.8.8.8", "8.8.4.4"]);
-
   for (const entry of hosts) {
     const [hostname, port] = entry.split(":");
     try {
-      const ips = await dns.promises.resolve4(hostname);
-      resolved.push(port ? `${ips[0]}:${port}` : ips[0]);
-      console.log(`[DB] Resolved ${hostname} -> ${ips[0]}`);
+      const ip = await dnsResolve(hostname);
+      resolved.push(port ? `${ip}:${port}` : ip);
+      console.log(`[DB] Resolved ${hostname} -> ${ip}`);
     } catch {
+      console.warn(`[DB] Could not resolve ${hostname}, keeping original`);
       resolved.push(entry);
     }
   }
@@ -66,10 +75,6 @@ async function connect() {
   if (!MONGODB_URI) {
     console.log("[DB] No MONGODB_URI set, using db.json");
     return;
-  }
-
-  if (MONGODB_URI.startsWith("mongodb+srv://")) {
-    try { dns.setServers(["8.8.8.8", "8.8.4.4"]); } catch (_) {}
   }
 
   let resolvedUri = MONGODB_URI;
