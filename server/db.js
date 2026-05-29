@@ -1,6 +1,5 @@
 const path = require("path");
 const fs = require("fs");
-const dns = require("dns");
 
 const DATA_DIR = path.join(__dirname, "data");
 const DB_PATH = path.join(DATA_DIR, "db.json");
@@ -40,16 +39,22 @@ async function connect() {
   }
 
   try {
-    // Resolve hostname to IPv4 to avoid IPv6 issues on Render
+    // Resolve hostname to IPv4 via Google DNS-over-HTTPS (bypasses Render's DNS)
     const parsed = new URL(PG_URI);
     const hostname = parsed.hostname;
     let resolvedIp = hostname;
     try {
-      const { address } = await dns.promises.lookup(hostname, { family: 4 });
-      resolvedIp = address;
-      console.log(`[DB] Resolved ${hostname} -> ${resolvedIp}`);
+      const dnsRes = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(hostname)}&type=A`);
+      const dnsData = await dnsRes.json();
+      if (dnsData.Status === 0 && dnsData.Answer) {
+        const ip = dnsData.Answer.find((a) => a.type === 1)?.data;
+        if (ip) {
+          resolvedIp = ip;
+          console.log(`[DB] Resolved ${hostname} -> ${resolvedIp}`);
+        }
+      }
     } catch (dnsErr) {
-      console.warn(`[DB] DNS lookup failed for ${hostname}, trying as-is:`, dnsErr.message);
+      console.warn(`[DB] DNS-over-HTTPS failed for ${hostname}:`, dnsErr.message);
     }
     parsed.hostname = resolvedIp;
     const resolvedUri = parsed.toString();
