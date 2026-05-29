@@ -56,7 +56,7 @@ async function connect() {
     // Neon requires the endpoint ID (first part of hostname) as a query param
     if (hostname.endsWith(".neon.tech")) {
       const endpointId = hostname.split(".")[0];
-      parsed.searchParams.set("options", `endpoint%3D${endpointId}`);
+      parsed.searchParams.set("options", `endpoint=${endpointId}`);
     }
 
     // Remove sslmode from query params — handled via options below
