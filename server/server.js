@@ -12,6 +12,37 @@ const HOST = process.env.HOST || "0.0.0.0";
 const CLIENT_DIST = path.join(__dirname, "..", "client", "dist");
 const TOKEN_SECRET = process.env.TOKEN_SECRET || "change-this-secret-before-hosting-sanji";
 const FFMPEG_PATH = process.env.FFMPEG_PATH || "ffmpeg";
+const COOKIES_PATH = path.join(__dirname, "cookies.txt");
+
+function setupCookies() {
+  // Priority 1: YOUTUBE_COOKIES env var (base64-encoded cookies.txt content)
+  const envCookies = process.env.YOUTUBE_COOKIES;
+  if (envCookies) {
+    try {
+      const decoded = Buffer.from(envCookies, "base64").toString("utf8");
+      fs.writeFileSync(COOKIES_PATH, decoded);
+      console.log("[COOKIES] Written from YOUTUBE_COOKIES env var");
+      return true;
+    } catch (err) {
+      console.error("[COOKIES] Failed to decode YOUTUBE_COOKIES env var:", err.message);
+    }
+  }
+  // Priority 2: cookies.txt already exists in server/ dir
+  if (fs.existsSync(COOKIES_PATH)) {
+    console.log("[COOKIES] Found existing cookies.txt");
+    return true;
+  }
+  console.warn("[COOKIES] No cookies configured — YouTube will likely block stream requests from data center IPs.");
+  console.warn("[COOKIES] Set YOUTUBE_COOKIES env var (base64 of cookies.txt) or place cookies.txt in server/");
+  return false;
+}
+
+function getCookiesArgs() {
+  if (fs.existsSync(COOKIES_PATH)) {
+    return ["--cookies", COOKIES_PATH];
+  }
+  return [];
+}
 
 app.use(cors());
 app.use(express.json());
@@ -295,7 +326,6 @@ app.get("/search", async (req, res) => {
 
   console.log(`[SEARCH] Searching for: "${query}"`);
 
-  const cookiesPath = path.join(__dirname, "cookies.txt");
   const args = [
     `ytsearch12:${query}`,
     "--dump-json",
@@ -304,11 +334,8 @@ app.get("/search", async (req, res) => {
     "--default-search", "ytsearch",
     "--extractor-args", "youtube:player_client=android,ios;player_skip=webpage",
     "--no-check-certificate",
+    ...getCookiesArgs(),
   ];
-  if (fs.existsSync(cookiesPath)) {
-    args.push("--cookies", cookiesPath);
-    console.log("[SEARCH] Using cookies.txt for authentication");
-  }
 
   const ytdlp = spawn("yt-dlp", args);
 
@@ -379,9 +406,8 @@ app.get("/stream/:videoId", (req, res) => {
   console.log(`[STREAM] Resolving direct URL for: ${videoId}`);
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const cookiesPath = path.join(__dirname, "cookies.txt");
 
-  const args = [
+  const ytdlp = spawn("yt-dlp", [
     url,
     "-f", "bestaudio",
     "--get-url",
@@ -389,13 +415,8 @@ app.get("/stream/:videoId", (req, res) => {
     "--no-playlist",
     "--extractor-args", "youtube:player_client=android,ios;player_skip=webpage",
     "--no-check-certificate",
-  ];
-  if (fs.existsSync(cookiesPath)) {
-    args.push("--cookies", cookiesPath);
-    console.log("[STREAM] Using cookies.txt for authentication");
-  }
-
-  const ytdlp = spawn("yt-dlp", args);
+    ...getCookiesArgs(),
+  ]);
 
   let output = "";
   ytdlp.stdout.on("data", (data) => { output += data.toString(); });
@@ -478,10 +499,12 @@ app.get("*", (req, res) => {
 });
 
 async function start() {
+  const hasCookies = setupCookies();
   await db.connect();
   app.listen(PORT, HOST, () => {
     console.log(`\n🔥 Diable Jambe Server running on http://${HOST}:${PORT}`);
     console.log(`❧  Database: ${db.getBackend()}`);
+    console.log(`❧  Cookies: ${hasCookies ? "✓ loaded" : "✗ not configured (streams may fail)"}`);
     if (HOST === "0.0.0.0") {
       console.log(`❧  Open http://YOUR_PC_IP:${PORT} on Android to use Sanji.`);
     }
