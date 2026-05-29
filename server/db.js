@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const dns = require("dns");
 
 const DATA_DIR = path.join(__dirname, "data");
 const DB_PATH = path.join(DATA_DIR, "db.json");
@@ -39,8 +40,22 @@ async function connect() {
   }
 
   try {
+    // Resolve hostname to IPv4 to avoid IPv6 issues on Render
+    const parsed = new URL(PG_URI);
+    const hostname = parsed.hostname;
+    let resolvedIp = hostname;
+    try {
+      const { address } = await dns.promises.lookup(hostname, { family: 4 });
+      resolvedIp = address;
+      console.log(`[DB] Resolved ${hostname} -> ${resolvedIp}`);
+    } catch (dnsErr) {
+      console.warn(`[DB] DNS lookup failed for ${hostname}, trying as-is:`, dnsErr.message);
+    }
+    parsed.hostname = resolvedIp;
+    const resolvedUri = parsed.toString();
+
     const { Pool } = require("pg");
-    pool = new Pool({ connectionString: PG_URI, ssl: { rejectUnauthorized: false }, family: 4 });
+    pool = new Pool({ connectionString: resolvedUri, ssl: { rejectUnauthorized: false } });
 
     // Test connection
     const client = await pool.connect();
