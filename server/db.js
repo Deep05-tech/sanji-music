@@ -37,11 +37,8 @@ async function connect() {
     return;
   }
 
-  // Fix DNS resolution for mongodb+srv:// URIs on Alpine/Render
   if (MONGODB_URI.startsWith("mongodb+srv://")) {
-    try {
-      dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
-    } catch (_) {}
+    try { dns.setServers(["8.8.8.8", "8.8.4.4"]); } catch (_) {}
   }
 
   const tryConnect = async (options = {}) => {
@@ -54,35 +51,21 @@ async function connect() {
   try {
     await tryConnect();
     console.log("[DB] Connected to MongoDB");
+    return;
   } catch (err) {
-    const msg = err.message || "";
-    if (msg.includes("querySrv") || msg.includes("ENOTFOUND")) {
-      console.log("[DB] SRV DNS failed, retrying with direct DNS ...");
-      dns.setServers(["8.8.8.8", "8.8.4.4"]);
-      try {
-        await tryConnect({ serverSelectionTimeoutMS: 10000, connectTimeoutMS: 10000 });
-        console.log("[DB] Connected to MongoDB (direct DNS)");
-        return;
-      } catch (retryErr) {
-        console.error("[DB] MongoDB still unreachable:", retryErr.message);
-      }
-    } else if (msg.includes("SSL") || msg.includes("ssl") || msg.includes("TLS") || msg.includes("tls")) {
-      console.log("[DB] TLS error, retrying with relaxed TLS ...");
-      try {
-        await tryConnect({ tls: true, tlsAllowInvalidCertificates: true });
-        console.log("[DB] Connected to MongoDB (relaxed TLS)");
-        return;
-      } catch (retryErr) {
-        console.error("[DB] MongoDB connection failed (relaxed TLS too):", retryErr.message);
-      }
-    } else {
-      console.error("[DB] MongoDB connection failed:", msg);
-    }
-
-    mongoClient = null;
-    mongoDb = null;
-    console.log("[DB] Falling back to db.json. If you see 'querySrv ENOTFOUND', get a non-SRV connection string from Atlas -> Connect -> Drivers -> toggle to 'Standard connection format'");
+    console.error("[DB] Initial connect failed:", err.message);
   }
+
+  try {
+    await tryConnect({ tlsInsecure: true, ssl: true, serverSelectionTimeoutMS: 10000 });
+    console.log("[DB] Connected to MongoDB (fallback TLS)");
+    return;
+  } catch (err) {
+    console.error("[DB] All MongoDB connection attempts failed:", err.message);
+  }
+
+  mongoClient = null;
+  mongoDb = null;
 }
 
 async function close() {
