@@ -62,7 +62,7 @@ function setupYtDlpUpdate() {
   const { exec } = require("child_process");
   const url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
   
-  exec(`curl -L "${url}" -o "${localYtDlpPath}" && chmod +x "${localYtDlpPath}"`, (err, stdout, stderr) => {
+  exec(`wget -q "${url}" -O "${localYtDlpPath}" && chmod +x "${localYtDlpPath}"`, (err, stdout, stderr) => {
     if (err) {
       console.warn("[YT-DLP] Background update failed:", err.message);
     } else {
