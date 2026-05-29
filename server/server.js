@@ -482,15 +482,18 @@ app.get("/debug-ytdlp", (req, res) => {
 
   if (videoId) {
     const spoofClient = client || "mweb,tv";
+    const format = req.query.format || "bestaudio/best";
     const args = [
       `https://www.youtube.com/watch?v=${videoId}`,
-      "-f", "bestaudio/best",
       "--get-url",
       "--no-warnings",
       "--no-playlist",
       "--extractor-args", `youtube:player_client=${spoofClient};player_skip=webpage`,
       "--no-check-certificate",
     ];
+    if (format !== "none") {
+      args.push("-f", format);
+    }
     if (fs.existsSync(COOKIES_PATH)) {
       args.push("--cookies", COOKIES_PATH);
     }
