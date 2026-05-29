@@ -1,0 +1,26 @@
+{
+  "name": "Sanji - Music Streaming",
+  "short_name": "Sanji",
+  "description": "A flame-lit music streaming experience.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0805",
+  "theme_color": "#080604",
+  "categories": ["music", "entertainment"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

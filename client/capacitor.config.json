@@ -1,0 +1,15 @@
+{
+  "appId": "com.sanji.music",
+  "appName": "Sanji",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "backgroundColor": "#080604",
+      "showSpinner": false
+    }
+  }
+}

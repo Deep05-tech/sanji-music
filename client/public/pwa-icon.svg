@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="75%">
+      <stop offset="0" stop-color="#1a1510"/>
+      <stop offset="1" stop-color="#080604"/>
+    </radialGradient>
+    <radialGradient id="ember" cx="35%" cy="25%" r="75%">
+      <stop offset="0" stop-color="#ffcb76"/>
+      <stop offset="0.5" stop-color="#ff7a00"/>
+      <stop offset="1" stop-color="#c45c00"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="310" r="170" fill="#ff7a00" opacity=".08"/>
+  <path d="M225 449c-62-51-87-107-70-176 15-60 67-87 72-161 62 64 26 124 94 174 50 36 55 101-7 163 8-43-12-80-46-106 1 43-23 76-43 106Z" fill="#ff4500" opacity=".62"/>
+  <path d="M283 65c45 28 62 72 51 123l-19 102c-8 42 11 77 54 102l60 32-38 63-111-58c-53-28-78-77-63-139l29-111c10-36-6-65-37-83l74-31Z" fill="url(#ember)"/>
+  <path d="M354 416c41 4 77 17 101 45-22 35-64 45-116 28l-48-17 30-66 33 10Z" fill="#d4a017"/>
+  <path d="M138 113h80" stroke="#d4a017" stroke-width="16" stroke-linecap="round" opacity=".7"/>
+  <path d="M112 150h76" stroke="#f5edd8" stroke-width="10" stroke-linecap="round" opacity=".28"/>
+</svg>

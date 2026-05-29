@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: sanji-music
+    runtime: docker
+    repo: https://github.com/YOUR_USERNAME/sanji-music
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: TOKEN_SECRET
+        generateValue: true
+      - key: PORT
+        value: 5000
+      - key: HOST
+        value: 0.0.0.0
+      - key: MONGODB_URI
+        sync: false
