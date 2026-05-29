@@ -57,6 +57,8 @@ async function connect() {
       console.warn(`[DB] DNS-over-HTTPS failed for ${hostname}:`, dnsErr.message);
     }
     parsed.hostname = resolvedIp;
+    // Remove sslmode from query params — handled via options below
+    parsed.searchParams.delete("sslmode");
     const resolvedUri = parsed.toString();
 
     const { Pool } = require("pg");
