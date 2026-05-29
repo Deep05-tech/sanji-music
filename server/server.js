@@ -437,11 +437,11 @@ app.get("/stream/:videoId", (req, res) => {
 
   const ytdlp = spawn(ytDlpCmd, [
     url,
-    "-f", "bestaudio",
+    "-f", "bestaudio/best",
     "--get-url",
     "--no-warnings",
     "--no-playlist",
-    "--extractor-args", "youtube:player_client=android,ios;player_skip=webpage",
+    "--extractor-args", "youtube:player_client=mweb,tv;player_skip=webpage",
     "--no-check-certificate",
     ...getCookiesArgs(),
   ]);
@@ -481,10 +481,10 @@ app.get("/debug-ytdlp", (req, res) => {
   const localStats = localExists ? fs.statSync(localYtDlpPath) : null;
 
   if (videoId) {
-    const spoofClient = client || "android,ios";
+    const spoofClient = client || "mweb,tv";
     const args = [
       `https://www.youtube.com/watch?v=${videoId}`,
-      "-f", "bestaudio",
+      "-f", "bestaudio/best",
       "--get-url",
       "--no-warnings",
       "--no-playlist",
