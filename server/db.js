@@ -39,27 +39,30 @@ async function connect() {
   }
 
   try {
-    // Resolve hostname to IPv4 via Google DNS-over-HTTPS (bypasses Render's DNS)
     const parsed = new URL(PG_URI);
     const hostname = parsed.hostname;
-    let resolvedIp = hostname;
+
+    // Keep original hostname (Neon requires it for SNI routing)
+    // Just verify DNS resolves via Google DoH, but don't replace
     try {
       const dnsRes = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(hostname)}&type=A`);
       const dnsData = await dnsRes.json();
       if (dnsData.Status === 0 && dnsData.Answer) {
         const ip = dnsData.Answer.find((a) => a.type === 1)?.data;
-        if (ip) {
-          resolvedIp = ip;
-          console.log(`[DB] Resolved ${hostname} -> ${resolvedIp}`);
-        }
+        if (ip) console.log(`[DB] ${hostname} resolves to ${ip}`);
       }
-    } catch (dnsErr) {
-      console.warn(`[DB] DNS-over-HTTPS failed for ${hostname}:`, dnsErr.message);
+    } catch (_) {}
+
+    // Neon requires the endpoint ID (first part of hostname) as a query param
+    if (hostname.endsWith(".neon.tech")) {
+      const endpointId = hostname.split(".")[0];
+      parsed.searchParams.set("options", `endpoint%3D${endpointId}`);
     }
-    parsed.hostname = resolvedIp;
+
     // Remove sslmode from query params — handled via options below
     parsed.searchParams.delete("sslmode");
     const resolvedUri = parsed.toString();
+    console.log(`[DB] Connecting to ${hostname}`);
 
     const { Pool } = require("pg");
     pool = new Pool({ connectionString: resolvedUri, ssl: { rejectUnauthorized: false } });
