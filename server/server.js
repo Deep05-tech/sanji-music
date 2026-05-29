@@ -500,6 +500,18 @@ app.get("*", (req, res) => {
 
 async function start() {
   const hasCookies = setupCookies();
+
+  // Try to self-update yt-dlp at startup to bypass breaking YouTube player changes
+  console.log("[YT-DLP] Checking for updates...");
+  const { exec } = require("child_process");
+  exec("yt-dlp -U", (err, stdout, stderr) => {
+    if (err) {
+      console.warn("[YT-DLP] Update check failed (this is normal if not running as root/writable environment):", err.message);
+    } else {
+      console.log("[YT-DLP] Update result:", stdout.trim() || stderr.trim() || "Already up to date");
+    }
+  });
+
   await db.connect();
   app.listen(PORT, HOST, () => {
     console.log(`\n🔥 Diable Jambe Server running on http://${HOST}:${PORT}`);
