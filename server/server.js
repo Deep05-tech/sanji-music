@@ -531,6 +531,16 @@ app.get("/debug-ytdlp", (req, res) => {
   ytdlp.stderr.on("data", (data) => { stderr += data.toString(); });
 
   ytdlp.on("close", (code) => {
+    let cookiesInfo = "none";
+    if (fs.existsSync(COOKIES_PATH)) {
+      const content = fs.readFileSync(COOKIES_PATH, "utf8");
+      const lines = content.split("\n").filter(l => l.trim() && !l.startsWith("#"));
+      cookiesInfo = lines.map(line => {
+        const parts = line.split("\t");
+        return parts.length >= 7 ? { domain: parts[0], name: parts[5], expiry: parts[4] } : line;
+      });
+    }
+
     res.json({
       ytDlpCmd,
       localYtDlpPath,
@@ -540,7 +550,8 @@ app.get("/debug-ytdlp", (req, res) => {
       code,
       stderr: stderr.trim(),
       platform: process.platform,
-      cookiesExists: fs.existsSync(COOKIES_PATH)
+      cookiesExists: fs.existsSync(COOKIES_PATH),
+      cookies: cookiesInfo
     });
   });
 
