@@ -1,8 +1,9 @@
-FROM node:20-alpine
+FROM node:20-slim
 
-RUN apk add --no-cache ffmpeg python3 wget ca-certificates && \
+RUN apt-get update && apt-get install -y ffmpeg python3 wget ca-certificates && \
     wget -O /usr/local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp && \
-    chmod +x /usr/local/bin/yt-dlp
+    chmod +x /usr/local/bin/yt-dlp && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
