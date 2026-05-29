@@ -487,7 +487,7 @@ app.get("/debug-ytdlp", (req, res) => {
       `https://www.youtube.com/watch?v=${videoId}`,
       "--no-warnings",
       "--no-playlist",
-      "--extractor-args", `youtube:player_client=${spoofClient};player_skip=webpage`,
+      "--extractor-args", `youtube:player_client=${spoofClient}${req.query.skipweb === "false" ? "" : ";player_skip=webpage"}`,
       "--no-check-certificate",
     ];
     if (format === "list") {
