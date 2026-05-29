@@ -315,6 +315,7 @@ function App() {
   });
 
   const audioRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
   const currentSong = currentIndex >= 0 && currentIndex < queue.length ? queue[currentIndex] : null;
   const smokeParticles = useMemo(() => makeParticles(34, 'smoke-particle', 16, 18), []);
   const emberParticles = useMemo(() => makeParticles(22, 'ember', 8, 12), []);
@@ -683,40 +684,58 @@ function App() {
     }
   };
 
-  const handleSearch = async (e) => {
-    if (e) e.preventDefault();
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!query || query.length < 2) return;
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const response = await fetch(`${apiUrl}/search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        setSearchResults(data.results || []);
+      } catch (error) {
+        console.error('Search failed:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 350);
+
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [searchQuery, apiUrl]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
     if (!searchQuery.trim()) return;
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
 
     const query = searchQuery.trim();
     setIsSearching(true);
     triggerLadyToastIfNeeded(query);
     navigateTo('Search');
 
-    try {
-      const response = await fetch(`${apiUrl}/search?q=${encodeURIComponent(query)}`);
-      const data = await response.json();
-      setSearchResults(data.results || []);
-    } catch (error) {
-      console.error('Search failed:', error);
-    } finally {
-      setIsSearching(false);
-    }
+    fetch(`${apiUrl}/search?q=${encodeURIComponent(query)}`)
+      .then((r) => r.json())
+      .then((data) => setSearchResults(data.results || []))
+      .catch((err) => console.error('Search failed:', err))
+      .finally(() => setIsSearching(false));
   };
 
-  const quickSearch = async (query) => {
+  const quickSearch = (query) => {
     setSearchQuery(query);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
     setIsSearching(true);
     navigateTo('Search');
 
-    try {
-      const response = await fetch(`${apiUrl}/search?q=${encodeURIComponent(query)}`);
-      const data = await response.json();
-      setSearchResults(data.results || []);
-    } catch (error) {
-      console.error('Search failed:', error);
-    } finally {
-      setIsSearching(false);
-    }
+    fetch(`${apiUrl}/search?q=${encodeURIComponent(query)}`)
+      .then((r) => r.json())
+      .then((data) => setSearchResults(data.results || []))
+      .catch((err) => console.error('Search failed:', err))
+      .finally(() => setIsSearching(false));
   };
 
   const playSong = (song, idx = -1) => {

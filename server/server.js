@@ -252,31 +252,38 @@ app.get("/search", async (req, res) => {
 
 app.get("/stream/:videoId", (req, res) => {
   const { videoId } = req.params;
-  console.log(`[STREAM] Streaming video: ${videoId}`);
+  console.log(`[STREAM] Resolving direct URL for: ${videoId}`);
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
 
   const ytdlp = spawn("yt-dlp", [
     url,
-    "-f", "bestaudio[ext=m4a]/bestaudio",
-    "-o", "-",
+    "-f", "bestaudio",
+    "--get-url",
     "--no-warnings",
     "--no-playlist",
   ]);
 
-  res.setHeader("Content-Type", "audio/mp4");
-  res.setHeader("Transfer-Encoding", "chunked");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Accept-Ranges", "none");
+  let output = "";
+  ytdlp.stdout.on("data", (data) => { output += data.toString(); });
+  let errOutput = "";
+  ytdlp.stderr.on("data", (data) => { errOutput += data.toString(); });
 
-  ytdlp.stdout.pipe(res);
-
-  ytdlp.stderr.on("data", (data) => {
-    const msg = data.toString();
-    if (!msg.includes("WARNING") && !msg.includes("[download]")) {
-      console.error(`[YT-DLP STDERR] ${msg}`);
+  ytdlp.on("close", (code) => {
+    const directUrl = output.trim();
+    if (code !== 0 || !directUrl) {
+      console.error(`[STREAM] yt-dlp failed (${code}): ${errOutput}`);
+      return res.status(500).json({ error: "Failed to resolve stream URL" });
     }
+    console.log(`[STREAM] Redirecting ${videoId} -> ${directUrl.slice(0, 60)}...`);
+    res.redirect(302, directUrl);
   });
+
+  ytdlp.on("error", (err) => {
+    console.error(`[STREAM] Spawn error: ${err.message}`);
+    if (!res.headersSent) res.status(500).json({ error: "Stream resolution failed" });
+  });
+});
 
   ytdlp.on("error", (err) => {
     console.error(`[YT-DLP ERROR] ${err.message}`);
