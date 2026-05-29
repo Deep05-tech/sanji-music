@@ -7,6 +7,7 @@ dist/
 server/data/
 server/cookies.txt
 cookies.txt
+server/yt-dlp-bin
 tmp/
 android/
 .capacitor/

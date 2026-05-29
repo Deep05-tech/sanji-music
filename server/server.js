@@ -44,6 +44,34 @@ function getCookiesArgs() {
   return [];
 }
 
+let ytDlpCmd = "yt-dlp";
+const localYtDlpPath = path.join(__dirname, "yt-dlp-bin");
+
+function setupYtDlpUpdate() {
+  if (process.platform === "win32") {
+    console.log("[YT-DLP] Running on Windows. Bypassing background binary download.");
+    return;
+  }
+
+  if (fs.existsSync(localYtDlpPath)) {
+    ytDlpCmd = localYtDlpPath;
+    console.log("[YT-DLP] Using existing local binary:", ytDlpCmd);
+  }
+
+  console.log("[YT-DLP] Checking/downloading latest Linux binary in background...");
+  const { exec } = require("child_process");
+  const url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
+  
+  exec(`curl -L "${url}" -o "${localYtDlpPath}" && chmod +x "${localYtDlpPath}"`, (err, stdout, stderr) => {
+    if (err) {
+      console.warn("[YT-DLP] Background update failed:", err.message);
+    } else {
+      ytDlpCmd = localYtDlpPath;
+      console.log("[YT-DLP] Background update complete. Using latest binary:", ytDlpCmd);
+    }
+  });
+}
+
 app.use(cors());
 app.use(express.json());
 
@@ -337,7 +365,7 @@ app.get("/search", async (req, res) => {
     ...getCookiesArgs(),
   ];
 
-  const ytdlp = spawn("yt-dlp", args);
+  const ytdlp = spawn(ytDlpCmd, args);
 
   let stdout = "";
   let stderr = "";
@@ -407,7 +435,7 @@ app.get("/stream/:videoId", (req, res) => {
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
 
-  const ytdlp = spawn("yt-dlp", [
+  const ytdlp = spawn(ytDlpCmd, [
     url,
     "-f", "bestaudio",
     "--get-url",
@@ -450,7 +478,7 @@ app.get("/metadata/:videoId", (req, res) => {
   const { videoId } = req.params;
   const url = `https://www.youtube.com/watch?v=${videoId}`;
 
-  const ytdlp = spawn("yt-dlp", [
+  const ytdlp = spawn(ytDlpCmd, [
     url,
     "--dump-json",
     "--no-warnings",
@@ -505,16 +533,8 @@ app.get("*", (req, res) => {
 async function start() {
   const hasCookies = setupCookies();
 
-  // Try to self-update yt-dlp at startup to bypass breaking YouTube player changes
-  console.log("[YT-DLP] Checking for updates...");
-  const { exec } = require("child_process");
-  exec("yt-dlp -U", (err, stdout, stderr) => {
-    if (err) {
-      console.warn("[YT-DLP] Update check failed (this is normal if not running as root/writable environment):", err.message);
-    } else {
-      console.log("[YT-DLP] Update result:", stdout.trim() || stderr.trim() || "Already up to date");
-    }
-  });
+  // Load and update yt-dlp in the background
+  setupYtDlpUpdate();
 
   await db.connect();
   app.listen(PORT, HOST, () => {
