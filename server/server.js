@@ -3,6 +3,7 @@ const cors = require("cors");
 const { spawn } = require("child_process");
 const path = require("path");
 const crypto = require("crypto");
+const fs = require("fs");
 const db = require("./db");
 
 const app = express();
@@ -294,16 +295,20 @@ app.get("/search", async (req, res) => {
 
   console.log(`[SEARCH] Searching for: "${query}"`);
 
+  const cookiesPath = path.join(__dirname, "cookies.txt");
   const args = [
     `ytsearch12:${query}`,
     "--dump-json",
     "--flat-playlist",
     "--no-warnings",
     "--default-search", "ytsearch",
-    "--extractor-args", "youtube:player_skip=webpage",
+    "--extractor-args", "youtube:player_client=android,ios;player_skip=webpage",
     "--no-check-certificate",
-    "--no-call-home",
   ];
+  if (fs.existsSync(cookiesPath)) {
+    args.push("--cookies", cookiesPath);
+    console.log("[SEARCH] Using cookies.txt for authentication");
+  }
 
   const ytdlp = spawn("yt-dlp", args);
 
@@ -374,17 +379,23 @@ app.get("/stream/:videoId", (req, res) => {
   console.log(`[STREAM] Resolving direct URL for: ${videoId}`);
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
+  const cookiesPath = path.join(__dirname, "cookies.txt");
 
-  const ytdlp = spawn("yt-dlp", [
+  const args = [
     url,
     "-f", "bestaudio",
     "--get-url",
     "--no-warnings",
     "--no-playlist",
-    "--extractor-args", "youtube:player_skip=webpage",
+    "--extractor-args", "youtube:player_client=android,ios;player_skip=webpage",
     "--no-check-certificate",
-    "--no-call-home",
-  ]);
+  ];
+  if (fs.existsSync(cookiesPath)) {
+    args.push("--cookies", cookiesPath);
+    console.log("[STREAM] Using cookies.txt for authentication");
+  }
+
+  const ytdlp = spawn("yt-dlp", args);
 
   let output = "";
   ytdlp.stdout.on("data", (data) => { output += data.toString(); });
