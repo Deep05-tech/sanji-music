@@ -15,6 +15,22 @@ const FFMPEG_PATH = process.env.FFMPEG_PATH || "ffmpeg";
 app.use(cors());
 app.use(express.json());
 
+const searchCache = new Map();
+const SEARCH_CACHE_TTL = 5 * 60 * 1000;
+
+function getCachedSearch(query) {
+  const key = query.toLowerCase().trim();
+  const entry = searchCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > SEARCH_CACHE_TTL) { searchCache.delete(key); return null; }
+  return entry.data;
+}
+
+function setCachedSearch(query, data) {
+  const key = query.toLowerCase().trim();
+  searchCache.set(key, { data, ts: Date.now() });
+}
+
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
@@ -161,6 +177,12 @@ app.get("/search", async (req, res) => {
     return res.status(400).json({ error: "Missing search query parameter 'q'" });
   }
 
+  const cached = getCachedSearch(query);
+  if (cached) {
+    console.log(`[SEARCH] Cache hit for: "${query}"`);
+    return res.json(cached);
+  }
+
   console.log(`[SEARCH] Searching for: "${query}"`);
 
   const args = [
@@ -213,7 +235,9 @@ app.get("/search", async (req, res) => {
         });
 
       console.log(`[SEARCH] Found ${results.length} results`);
-      res.json({ results });
+      const payload = { results };
+      setCachedSearch(query, payload);
+      res.json(payload);
     } catch (err) {
       console.error(`[SEARCH PARSE ERROR] ${err.message}`);
       res.status(500).json({ error: "Failed to parse search results" });
@@ -234,39 +258,18 @@ app.get("/stream/:videoId", (req, res) => {
 
   const ytdlp = spawn("yt-dlp", [
     url,
-    "-f", "bestaudio",
+    "-f", "bestaudio[ext=m4a]/bestaudio",
     "-o", "-",
     "--no-warnings",
     "--no-playlist",
   ]);
 
-  const ffmpeg = spawn(FFMPEG_PATH, [
-    "-i", "pipe:0",
-    "-vn",
-    "-acodec", "libmp3lame",
-    "-ab", "192k",
-    "-f", "mp3",
-    "pipe:1",
-  ], {
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-
-  ytdlp.stdout.pipe(ffmpeg.stdin);
-
-  ffmpeg.stdin.on('error', (err) => {
-    if (err.code !== 'EPIPE') console.error(`[FFMPEG STDIN ERROR] ${err.message}`);
-  });
-
-  ytdlp.stdout.on('error', (err) => {
-    if (err.code !== 'EPIPE') console.error(`[YTDLP STDOUT ERROR] ${err.message}`);
-  });
-
-  res.setHeader("Content-Type", "audio/mpeg");
+  res.setHeader("Content-Type", "audio/mp4");
   res.setHeader("Transfer-Encoding", "chunked");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Accept-Ranges", "none");
 
-  ffmpeg.stdout.pipe(res);
+  ytdlp.stdout.pipe(res);
 
   ytdlp.stderr.on("data", (data) => {
     const msg = data.toString();
@@ -282,24 +285,15 @@ app.get("/stream/:videoId", (req, res) => {
     }
   });
 
-  ffmpeg.on("error", (err) => {
-    console.error(`[FFMPEG ERROR] ${err.message}`);
-    if (!res.headersSent) {
-      res.status(500).json({ error: "ffmpeg failed" });
-    }
-  });
-
   ytdlp.on("close", (code) => {
     if (code !== 0) {
       console.error(`[YT-DLP] Process exited with code ${code}`);
     }
-    ffmpeg.stdin.end();
   });
 
   req.on("close", () => {
     console.log(`[STREAM] Client disconnected for ${videoId}`);
     ytdlp.kill("SIGTERM");
-    ffmpeg.kill("SIGTERM");
   });
 });
 

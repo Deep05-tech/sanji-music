@@ -195,6 +195,7 @@ function AuthScreen({
   onModeChange,
   onFormChange,
   onSubmit,
+  onClose,
 }) {
   const isRegister = mode === 'register';
   const [showServerTools, setShowServerTools] = useState(false);
@@ -206,6 +207,11 @@ function AuthScreen({
         <div className="candle-glow" />
       </div>
       <section className="auth-card">
+        {onClose && (
+          <button className="auth-close-btn" onClick={onClose} type="button" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        )}
         <div className="auth-brand">
           <FlameLegLogo />
           <div>
@@ -295,6 +301,7 @@ function App() {
   const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [remoteLibraryLoaded, setRemoteLibraryLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState('Home');
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -375,8 +382,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!authToken) return;
-
     const loadHomeData = async () => {
       try {
         const fetchSection = async (query) => {
@@ -399,7 +404,7 @@ function App() {
     };
 
     loadHomeData();
-  }, [apiUrl, authToken]);
+  }, [apiUrl]);
 
   useEffect(() => {
     if (!authToken) return undefined;
@@ -620,6 +625,7 @@ function App() {
 
       setAuthToken(data.token);
       setAuthUser(data.user);
+      setShowAuthModal(false);
       setRemoteLibraryLoaded(false);
       setAuthForm({ name: '', email: '', password: '' });
       setActiveTab('Home');
@@ -654,6 +660,10 @@ function App() {
   const toggleLike = (e, song) => {
     e.stopPropagation();
     if (!song?.videoId) return;
+    if (!authToken) {
+      setShowAuthModal(true);
+      return;
+    }
     setLikedSongs((prev) => {
       const next = { ...prev };
       if (next[song.videoId]) {
@@ -837,28 +847,29 @@ function App() {
 
   const likedCount = Object.keys(likedSongs).length;
 
-  if (!authToken || !authUser) {
-    return (
-      <AuthScreen
-        mode={authMode}
-        form={authForm}
-        error={authError}
-        isLoading={isAuthLoading}
-        apiDraft={apiDraft}
-        onApiDraftChange={setApiDraft}
-        onSaveApiSettings={applyApiSettings}
-        onModeChange={(mode) => {
-          setAuthMode(mode);
-          setAuthError('');
-        }}
-        onFormChange={setAuthForm}
-        onSubmit={handleAuthSubmit}
-      />
-    );
-  }
-
   return (
     <div className="app-wrapper">
+
+      {showAuthModal && (
+        <div className="auth-overlay">
+          <AuthScreen
+            mode={authMode}
+            form={authForm}
+            error={authError}
+            isLoading={isAuthLoading}
+            apiDraft={apiDraft}
+            onApiDraftChange={setApiDraft}
+            onSaveApiSettings={applyApiSettings}
+            onModeChange={(mode) => {
+              setAuthMode(mode);
+              setAuthError('');
+            }}
+            onFormChange={setAuthForm}
+            onSubmit={handleAuthSubmit}
+            onClose={() => { setShowAuthModal(false); setAuthError(''); }}
+          />
+        </div>
+      )}
       <div className="bg-effects" aria-hidden="true">
         <div className="suit-pinstripe" />
         <div className="candle-glow" />
@@ -992,9 +1003,9 @@ function App() {
               />
             </form>
 
-            <button className="user-profile" onClick={() => setShowSettings(true)} type="button">
+            <button className="user-profile" onClick={() => authUser ? setShowSettings(true) : setShowAuthModal(true)} type="button">
               <div className="avatar"><User size={18} /></div>
-              <span>{authUser.name || 'Chef'}</span>
+              <span>{authUser ? authUser.name || 'Chef' : 'Sign In'}</span>
               <ChevronDown size={15} />
             </button>
           </header>
