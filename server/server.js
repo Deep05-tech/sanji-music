@@ -494,7 +494,7 @@ app.get("/debug-ytdlp", (req, res) => {
     if (format !== "none") {
       args.push("-f", format);
     }
-    if (fs.existsSync(COOKIES_PATH)) {
+    if (fs.existsSync(COOKIES_PATH) && req.query.nocookies !== "true") {
       args.push("--cookies", COOKIES_PATH);
     }
 
