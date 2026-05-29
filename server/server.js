@@ -427,7 +427,11 @@ app.get("/stream/:videoId", (req, res) => {
     const directUrl = output.trim();
     if (code !== 0 || !directUrl) {
       console.error(`[STREAM] yt-dlp failed (${code}): ${errOutput}`);
-      return res.status(500).json({ error: "Failed to resolve stream URL" });
+      return res.status(500).json({ 
+        error: "Failed to resolve stream URL", 
+        code, 
+        details: errOutput.trim() 
+      });
     }
     console.log(`[STREAM] Redirecting ${videoId} -> ${directUrl.slice(0, 60)}...`);
     setCachedStream(videoId, directUrl);
