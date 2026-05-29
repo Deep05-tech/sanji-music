@@ -40,7 +40,7 @@ async function connect() {
 
   try {
     const { Pool } = require("pg");
-    pool = new Pool({ connectionString: PG_URI, ssl: { rejectUnauthorized: false } });
+    pool = new Pool({ connectionString: PG_URI, ssl: { rejectUnauthorized: false }, family: 4 });
 
     // Test connection
     const client = await pool.connect();
