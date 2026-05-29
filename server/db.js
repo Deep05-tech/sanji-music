@@ -1,13 +1,10 @@
-const { MongoClient } = require("mongodb");
 const path = require("path");
 const fs = require("fs");
 
 const DATA_DIR = path.join(__dirname, "data");
 const DB_PATH = path.join(DATA_DIR, "db.json");
-const MONGODB_URI = process.env.MONGODB_URI;
 
-let mongoClient = null;
-let mongoDb = null;
+let pool = null;
 
 function ensureJsonDb() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -26,114 +23,94 @@ function writeJsonDb(data) {
   fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
 }
 
-function isMongo() {
-  return mongoClient !== null && mongoDb !== null;
-}
-
-// Resolve hostnames to IPs using Google DNS-over-HTTPS (port 443).
-// This bypasses Render's DNS issues with Atlas hostnames.
-async function dnsResolve(hostname) {
-  const url = `https://dns.google/resolve?name=${encodeURIComponent(hostname)}&type=A`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.Status === 0 && data.Answer) {
-    const ip = data.Answer.find((a) => a.type === 1)?.data;
-    if (ip) return ip;
-  }
-  throw new Error(`DNS resolution failed for ${hostname}`);
-}
-
-async function resolveHostsToIps(uri) {
-  if (!uri.startsWith("mongodb://")) return uri;
-
-  const authEnd = uri.indexOf("@");
-  const afterHosts = uri.indexOf("/", authEnd > 0 ? authEnd : 8);
-  const hostsPart = uri.slice(authEnd > 0 ? authEnd + 1 : 8, afterHosts > 0 ? afterHosts : undefined);
-
-  const hosts = hostsPart.split(",");
-  const resolved = [];
-
-  for (const entry of hosts) {
-    const [hostname, port] = entry.split(":");
-    try {
-      const ip = await dnsResolve(hostname);
-      resolved.push(port ? `${ip}:${port}` : ip);
-      console.log(`[DB] Resolved ${hostname} -> ${ip}`);
-    } catch {
-      console.warn(`[DB] Could not resolve ${hostname}, keeping original`);
-      resolved.push(entry);
-    }
-  }
-
-  let result = uri.slice(0, authEnd > 0 ? authEnd + 1 : 8);
-  result += resolved.join(",");
-  if (afterHosts > 0) result += uri.slice(afterHosts);
-  return result;
+function isPg() {
+  return pool !== null;
 }
 
 async function connect() {
-  if (!MONGODB_URI) {
-    console.log("[DB] No MONGODB_URI set, using db.json");
+  const PG_URI = process.env.MONGODB_URI || process.env.DATABASE_URL;
+  if (!PG_URI) {
+    console.log("[DB] No database URI set, using db.json");
     return;
   }
-
-  let resolvedUri = MONGODB_URI;
-  if (MONGODB_URI.startsWith("mongodb://")) {
-    resolvedUri = await resolveHostsToIps(MONGODB_URI);
-  }
-
-  const tryConnect = async (options = {}) => {
-    const client = new MongoClient(resolvedUri, options);
-    await client.connect();
-    mongoClient = client;
-    mongoDb = client.db();
-  };
-
-  try {
-    await tryConnect();
-    console.log("[DB] Connected to MongoDB");
+  if (!PG_URI.startsWith("postgresql://")) {
+    console.log("[DB] URI is not PostgreSQL, using db.json");
     return;
-  } catch (err) {
-    console.error("[DB] Initial connect failed:", err.message);
   }
 
   try {
-    await tryConnect({ tlsInsecure: true, ssl: true, serverSelectionTimeoutMS: 10000 });
-    console.log("[DB] Connected to MongoDB (fallback TLS)");
-    return;
-  } catch (err) {
-    console.error("[DB] All MongoDB connection attempts failed:", err.message);
-  }
+    const { Pool } = require("pg");
+    pool = new Pool({ connectionString: PG_URI, ssl: { rejectUnauthorized: false } });
 
-  mongoClient = null;
-  mongoDb = null;
+    // Test connection
+    const client = await pool.connect();
+    await client.query("SELECT 1");
+    client.release();
+
+    // Create tables if they don't exist
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS libraries (
+        user_id TEXT PRIMARY KEY REFERENCES users(id),
+        liked_songs JSONB DEFAULT '{}',
+        playlists JSONB DEFAULT '[]',
+        recently_played JSONB DEFAULT '[]',
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    console.log("[DB] Connected to PostgreSQL");
+  } catch (err) {
+    console.error("[DB] PostgreSQL connection failed:", err.message);
+    await close();
+  }
 }
 
 async function close() {
-  if (mongoClient) await mongoClient.close();
+  if (pool) {
+    await pool.end();
+    pool = null;
+  }
 }
 
 async function findUserByEmail(email) {
-  if (isMongo()) return await mongoDb.collection("users").findOne({ email });
+  if (isPg()) {
+    const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    return result.rows[0] || null;
+  }
   return readJsonDb().users.find((u) => u.email === email) || null;
 }
 
 async function findUserById(id) {
-  if (isMongo()) return await mongoDb.collection("users").findOne({ id });
+  if (isPg()) {
+    const result = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
+    return result.rows[0] || null;
+  }
   return readJsonDb().users.find((u) => u.id === id) || null;
 }
 
 async function emailExists(email) {
-  if (isMongo()) {
-    const count = await mongoDb.collection("users").countDocuments({ email }, { limit: 1 });
-    return count > 0;
+  if (isPg()) {
+    const result = await pool.query("SELECT 1 FROM users WHERE email = $1 LIMIT 1", [email]);
+    return result.rowCount > 0;
   }
   return readJsonDb().users.some((u) => u.email === email);
 }
 
 async function createUser(user) {
-  if (isMongo()) {
-    await mongoDb.collection("users").insertOne(user);
+  if (isPg()) {
+    await pool.query(
+      "INSERT INTO users (id, name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5)",
+      [user.id, user.name, user.email, user.passwordHash, user.createdAt]
+    );
     return;
   }
   const data = readJsonDb();
@@ -142,44 +119,51 @@ async function createUser(user) {
 }
 
 async function initLibrary(userId) {
-  const lib = { likedSongs: {}, playlists: [], recentlyPlayed: [] };
-  if (isMongo()) {
-    await mongoDb.collection("libraries").insertOne({ userId, ...lib });
+  if (isPg()) {
+    await pool.query(
+      "INSERT INTO libraries (user_id, liked_songs, playlists, recently_played) VALUES ($1, '{}', '[]', '[]') ON CONFLICT (user_id) DO NOTHING",
+      [userId]
+    );
     return;
   }
   const data = readJsonDb();
-  data.libraries[userId] = lib;
+  data.libraries[userId] = { likedSongs: {}, playlists: [], recentlyPlayed: [] };
   writeJsonDb(data);
 }
 
 async function getLibrary(userId) {
-  if (isMongo()) {
-    const lib = await mongoDb.collection("libraries").findOne({ userId });
-    if (!lib) return { likedSongs: {}, playlists: [], recentlyPlayed: [] };
-    const { _id, ...rest } = lib;
-    return rest;
+  if (isPg()) {
+    const result = await pool.query("SELECT * FROM libraries WHERE user_id = $1", [userId]);
+    if (result.rows.length === 0) return { likedSongs: {}, playlists: [], recentlyPlayed: [] };
+    const row = result.rows[0];
+    return {
+      likedSongs: row.liked_songs || {},
+      playlists: row.playlists || [],
+      recentlyPlayed: row.recently_played || [],
+    };
   }
   const data = readJsonDb();
   return data.libraries[userId] || { likedSongs: {}, playlists: [], recentlyPlayed: [] };
 }
 
 async function setLibrary(userId, library) {
-  const data = { ...library, updatedAt: new Date().toISOString() };
-  if (isMongo()) {
-    await mongoDb.collection("libraries").updateOne(
-      { userId },
-      { $set: { ...data, userId } },
-      { upsert: true }
+  if (isPg()) {
+    await pool.query(
+      `INSERT INTO libraries (user_id, liked_songs, playlists, recently_played, updated_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (user_id) DO UPDATE SET
+         liked_songs = $2, playlists = $3, recently_played = $4, updated_at = NOW()`,
+      [userId, JSON.stringify(library.likedSongs), JSON.stringify(library.playlists), JSON.stringify(library.recentlyPlayed)]
     );
     return;
   }
-  const db = readJsonDb();
-  db.libraries[userId] = data;
-  writeJsonDb(db);
+  const data = readJsonDb();
+  data.libraries[userId] = { ...library, updatedAt: new Date().toISOString() };
+  writeJsonDb(data);
 }
 
 function getBackend() {
-  return isMongo() ? "mongodb" : "db.json";
+  return isPg() ? "postgresql" : "db.json";
 }
 
 module.exports = { connect, close, findUserByEmail, findUserById, emailExists, createUser, initLibrary, getLibrary, setLibrary, getBackend };
