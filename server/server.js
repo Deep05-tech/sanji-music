@@ -474,6 +474,41 @@ app.get("/stream/:videoId", (req, res) => {
 
 
 
+app.get("/debug-ytdlp", (req, res) => {
+  const localExists = fs.existsSync(localYtDlpPath);
+  const localStats = localExists ? fs.statSync(localYtDlpPath) : null;
+
+  const ytdlp = spawn(ytDlpCmd, ["--version"]);
+  let stdout = "";
+  let stderr = "";
+
+  ytdlp.stdout.on("data", (data) => { stdout += data.toString(); });
+  ytdlp.stderr.on("data", (data) => { stderr += data.toString(); });
+
+  ytdlp.on("close", (code) => {
+    res.json({
+      ytDlpCmd,
+      localYtDlpPath,
+      localExists,
+      localSize: localStats ? localStats.size : 0,
+      version: stdout.trim(),
+      code,
+      stderr: stderr.trim(),
+      platform: process.platform,
+      cookiesExists: fs.existsSync(COOKIES_PATH)
+    });
+  });
+
+  ytdlp.on("error", (err) => {
+    res.json({
+      error: err.message,
+      ytDlpCmd,
+      localExists,
+      platform: process.platform
+    });
+  });
+});
+
 app.get("/metadata/:videoId", (req, res) => {
   const { videoId } = req.params;
   const url = `https://www.youtube.com/watch?v=${videoId}`;
