@@ -5,6 +5,8 @@ dist/
 .env
 .env.local
 server/data/
+server/cookies.txt
+cookies.txt
 tmp/
 android/
 .capacitor/
