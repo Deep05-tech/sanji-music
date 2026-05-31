@@ -13,7 +13,9 @@ import {
   ChevronRight,
   User,
   Maximize2,
+  Minimize2,
   Mic2,
+  Radio,
   ListMusic,
   Utensils,
   Flame,
@@ -85,10 +87,10 @@ const CATEGORY_CARDS = [
 
 const DEFAULT_PLAYLISTS = [
   { id: 'all-blue', title: 'All Blue', accent: 'all-blue', kind: 'smart', query: 'ocean jazz chill music' },
-  { id: 'candlelit-service', title: 'Candlelit Service', kind: 'smart', query: 'romantic dinner jazz' },
-  { id: 'diable-jambe-drive', title: 'Diable Jambe Drive', kind: 'smart', query: 'high energy funk rock' },
-  { id: 'after-hours-jazz', title: 'After Hours Jazz', kind: 'smart', query: 'underground jazz bar' },
-  { id: 'chef-mise-en-place', title: 'Chef\'s Mise en Place', kind: 'smart', query: 'focus cooking playlist' },
+  { id: 'candlelit', title: 'Candlelit Service', accent: 'candlelit', kind: 'smart', query: 'candlelight jazz dinner music' },
+  { id: 'diable-jambe', title: 'Diable Jambe Drive', accent: 'diable-jambe', kind: 'smart', query: 'upbeat funk jazz rock' },
+  { id: 'after-hours', title: 'After Hours Jazz', accent: 'after-hours', kind: 'smart', query: 'late night jazz bar' },
+  { id: 'chef-prep', title: 'Chef\'s Mise en Place', accent: 'chef-prep', kind: 'smart', query: 'focus cooking lofi beats' },
 ];
 
 function readJsonStorage(key, fallback) {
@@ -242,8 +244,8 @@ function AuthScreen({
         <div className="auth-brand">
           <FlameLegLogo />
           <div>
-            <span className="logo-kicker">DIABLE</span>
-            <h1>Sanji</h1>
+            <span className="logo-kicker">SANJI</span>
+            <h1>MUSIC</h1>
           </div>
         </div>
         <p className="auth-copy">Sign in to keep your kitchen, liked songs, and playlists synced across devices.</p>
@@ -322,6 +324,8 @@ function App() {
   const [apiUrl, setApiUrl] = useState(() => localStorage.getItem(API_STORAGE_KEY) || DEFAULT_API_URL);
   const [apiDraft, setApiDraft] = useState(() => localStorage.getItem(API_STORAGE_KEY) || DEFAULT_API_URL);
   const [showSettings, setShowSettings] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isRadioLoading, setIsRadioLoading] = useState(false);
   const [authToken, setAuthToken] = useState(() => localStorage.getItem(AUTH_TOKEN_KEY) || '');
   const [authUser, setAuthUser] = useState(() => readJsonStorage(AUTH_USER_KEY, null));
   const [authMode, setAuthMode] = useState('login');
@@ -511,7 +515,9 @@ function App() {
       }
     }, 700);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+    };
   }, [apiUrl, authToken, likedSongs, playlists, recentlyPlayed, remoteLibraryLoaded]);
 
   const navigateTo = (tab) => {
@@ -784,6 +790,29 @@ function App() {
     executeSearch(query);
   };
 
+  const startRadio = async () => {
+    if (!currentSong) return;
+    setIsRadioLoading(true);
+    try {
+      const query = `${currentSong.channel} ${currentSong.title} mix`;
+      const response = await fetch(`${apiUrl}/search?q=${encodeURIComponent(query)}`);
+      const data = await response.json();
+      const results = data.results || [];
+      if (results.length > 0) {
+        const related = results.filter((s) => s.videoId !== currentSong.videoId).slice(0, 15);
+        if (related.length > 0) {
+          if (repeatMode === 'one') setRepeatMode('all');
+          const newQueue = [...queue.slice(0, currentIndex + 1), ...related];
+          setQueue(newQueue);
+        }
+      }
+    } catch (error) {
+      console.error('Radio generation failed:', error);
+    } finally {
+      setIsRadioLoading(false);
+    }
+  };
+
   const playSong = (song, idx = -1) => {
     let newIndex = idx;
 
@@ -998,9 +1027,9 @@ function App() {
           <div className="sidebar-content">
             <button className="logo-block" onClick={() => navigateTo('Home')} type="button" aria-label="Go home">
               <FlameLegLogo />
-              <div>
-                <div className="logo-kicker">DIABLE</div>
-                <div className="logo-text">Sanji</div>
+              <div className="auth-logo">
+                <span className="logo-kicker">Sanji</span>
+                <span className="logo-main">MUSIC</span>
               </div>
             </button>
 
@@ -1226,7 +1255,7 @@ function App() {
 
             <footer className="site-footer scroll-fade">
               <div className="footer-divider" />
-              <div className="footer-title">DIABLE - Music for Connoisseurs</div>
+              <div className="footer-title">Sanji - Music for Connoisseurs</div>
               <div className="footer-sub">Every track. Perfectly cooked.</div>
             </footer>
           </div>
@@ -1234,6 +1263,49 @@ function App() {
       </div>
 
       <audio ref={audioRef} onEnded={playNext} onTimeUpdate={onTimeUpdate} />
+
+      {isFullscreen && currentSong && (
+        <div className="fullscreen-overlay">
+          <div className="fs-left">
+            <div className="fs-info">
+              <h1 className="fs-title">{currentSong.title}</h1>
+              <h2 className="fs-artist">{currentSong.channel}</h2>
+            </div>
+            
+            <div className="fs-actions">
+              <button className={`action-btn primary ${isRadioLoading ? 'pulsing' : ''}`} onClick={startRadio} disabled={isRadioLoading} type="button">
+                <Radio size={20} />
+                <span>Start Radio</span>
+              </button>
+            </div>
+            
+            {queue.length > currentIndex + 1 && (
+              <div className="fs-queue">
+                <h3>Up Next</h3>
+                <div className="fs-queue-list">
+                  {queue.slice(currentIndex + 1, currentIndex + 4).map((song, i) => (
+                    <div className="fs-queue-item" key={`fs-queue-${song.videoId}-${i}`}>
+                      <img src={song.thumbnail} alt="" />
+                      <div>
+                        <div className="fs-queue-title">{song.title}</div>
+                        <div className="fs-queue-artist">{song.channel}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="fs-right">
+            <img className="fs-album-art" src={currentSong.thumbnail.replace('hqdefault', 'maxresdefault')} onError={(e) => { e.target.src = currentSong.thumbnail; }} alt="Album Art" />
+          </div>
+
+          <button className="fs-close" onClick={() => setIsFullscreen(false)} aria-label="Exit Fullscreen" type="button">
+            <Minimize2 size={24} />
+          </button>
+        </div>
+      )}
 
       <div className="player-bar">
         <div className="player-left">
@@ -1295,8 +1367,12 @@ function App() {
         </div>
 
         <div className="player-right">
-          <Mic2 size={16} className="player-icon" />
-          <ListMusic size={16} className="player-icon" onClick={openLibraryQueue} />
+          <button className={`ctrl-btn ${isRadioLoading ? 'pulsing' : ''}`} onClick={startRadio} type="button" aria-label="Start Radio" disabled={!currentSong || isRadioLoading}>
+            <Radio size={16} />
+          </button>
+          <button className="ctrl-btn" onClick={openLibraryQueue} type="button" aria-label="Queue">
+            <ListMusic size={16} />
+          </button>
           <button className="ctrl-btn" onClick={() => setIsMuted(!isMuted)} type="button" aria-label="Mute">
             {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </button>
@@ -1314,7 +1390,9 @@ function App() {
             style={{ backgroundSize: `${(isMuted ? 0 : volume) * 100}% 100%` }}
             aria-label="Volume"
           />
-          <Maximize2 size={16} className="player-icon" />
+          <button className="ctrl-btn" onClick={() => setIsFullscreen(true)} type="button" aria-label="Fullscreen">
+            <Maximize2 size={16} />
+          </button>
         </div>
       </div>
 
