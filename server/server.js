@@ -487,9 +487,15 @@ app.get("/debug-ytdlp", (req, res) => {
       `https://www.youtube.com/watch?v=${videoId}`,
       "--no-warnings",
       "--no-playlist",
-      "--extractor-args", `youtube:player_client=${spoofClient}${req.query.skipweb === "false" ? "" : ";player_skip=webpage"}`,
       "--no-check-certificate",
     ];
+    if (spoofClient !== "default") {
+      args.push("--extractor-args", `youtube:player_client=${spoofClient}${req.query.skipweb === "false" ? "" : ";player_skip=webpage"}`);
+    } else {
+      if (req.query.skipweb !== "false") {
+        args.push("--extractor-args", "youtube:player_skip=webpage");
+      }
+    }
     if (format === "list") {
       args.push("--list-formats");
     } else {
