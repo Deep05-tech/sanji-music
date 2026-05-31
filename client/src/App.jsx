@@ -427,12 +427,17 @@ function App() {
           return results;
         };
 
-        const [recentlyServed, specials, freshKitchen, recommendation] = await Promise.all([
-          fetchSection(SECTION_QUERIES.recentlyServed),
-          fetchSection(SECTION_QUERIES.specials),
-          fetchSection(SECTION_QUERIES.freshKitchen),
-          fetchSection(SECTION_QUERIES.recommendation),
-        ]);
+        const delayFetch = async (query) => {
+          if (getSearchCache(query)) return fetchSection(query);
+          const res = await fetchSection(query);
+          await new Promise(r => setTimeout(r, 1500));
+          return res;
+        };
+
+        const recentlyServed = await delayFetch(SECTION_QUERIES.recentlyServed);
+        const specials = await delayFetch(SECTION_QUERIES.specials);
+        const freshKitchen = await delayFetch(SECTION_QUERIES.freshKitchen);
+        const recommendation = await delayFetch(SECTION_QUERIES.recommendation);
 
         setHomeData({ recentlyServed, specials, freshKitchen, recommendation });
       } catch (err) {

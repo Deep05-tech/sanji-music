@@ -80,7 +80,7 @@ app.use(cors());
 app.use(express.json());
 
 const searchCache = new Map();
-const SEARCH_CACHE_TTL = 5 * 60 * 1000;
+const SEARCH_CACHE_TTL = 6 * 60 * 60 * 1000;
 
 function getCachedSearch(query) {
   const key = query.toLowerCase().trim();
