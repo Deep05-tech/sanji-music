@@ -4,6 +4,8 @@ const { spawn } = require("child_process");
 const path = require("path");
 const crypto = require("crypto");
 const fs = require("fs");
+const http = require("http");
+const https = require("https");
 const db = require("./db");
 
 const app = express();
@@ -423,13 +425,73 @@ app.get("/search", async (req, res) => {
   });
 });
 
+function proxyStream(sourceUrl, req, res, _redirects) {
+  const hops = _redirects || 0;
+  if (hops > 5) {
+    if (!res.headersSent) res.status(502).json({ error: "Too many redirects" });
+    return;
+  }
+
+  const parsed = new URL(sourceUrl);
+  const transport = parsed.protocol === "https:" ? https : http;
+
+  const proxyHeaders = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  };
+  if (req.headers.range) {
+    proxyHeaders["Range"] = req.headers.range;
+  }
+
+  const proxyReq = transport.get(sourceUrl, { headers: proxyHeaders, timeout: 15000 }, (upstream) => {
+    // Follow redirects from googlevideo
+    if ([301, 302, 303, 307, 308].includes(upstream.statusCode) && upstream.headers.location) {
+      upstream.resume();
+      return proxyStream(upstream.headers.location, req, res, hops + 1);
+    }
+
+    if (upstream.statusCode >= 400) {
+      console.error(`[STREAM] Upstream ${upstream.statusCode} for ${sourceUrl.slice(0, 80)}`);
+      upstream.resume();
+      if (!res.headersSent) res.status(upstream.statusCode).json({ error: "Upstream error " + upstream.statusCode });
+      return;
+    }
+
+    const fwd = {
+      "Content-Type": upstream.headers["content-type"] || "audio/mp4",
+      "Accept-Ranges": "bytes",
+    };
+    if (upstream.headers["content-length"]) fwd["Content-Length"] = upstream.headers["content-length"];
+    if (upstream.headers["content-range"]) fwd["Content-Range"] = upstream.headers["content-range"];
+
+    res.writeHead(upstream.statusCode, fwd);
+    upstream.pipe(res);
+
+    upstream.on("error", (err) => {
+      console.error(`[STREAM] Pipe error: ${err.message}`);
+      res.destroy();
+    });
+  });
+
+  proxyReq.on("error", (err) => {
+    console.error(`[STREAM] Proxy error: ${err.message}`);
+    if (!res.headersSent) res.status(502).json({ error: "Stream proxy failed" });
+  });
+
+  proxyReq.on("timeout", () => {
+    proxyReq.destroy();
+    if (!res.headersSent) res.status(504).json({ error: "Stream proxy timeout" });
+  });
+
+  req.on("close", () => proxyReq.destroy());
+}
+
 app.get("/stream/:videoId", (req, res) => {
   const { videoId } = req.params;
 
   const cachedUrl = getCachedStream(videoId);
   if (cachedUrl) {
-    console.log(`[STREAM] Cache hit for: ${videoId}`);
-    return res.redirect(302, cachedUrl);
+    console.log(`[STREAM] Cache hit, proxying: ${videoId}`);
+    return proxyStream(cachedUrl, req, res);
   }
 
   console.log(`[STREAM] Resolving direct URL for: ${videoId}`);
@@ -463,9 +525,9 @@ app.get("/stream/:videoId", (req, res) => {
         details: errOutput.trim() 
       });
     }
-    console.log(`[STREAM] Redirecting ${videoId} -> ${directUrl.slice(0, 60)}...`);
+    console.log(`[STREAM] Proxying ${videoId} -> ${directUrl.slice(0, 60)}...`);
     setCachedStream(videoId, directUrl);
-    res.redirect(302, directUrl);
+    proxyStream(directUrl, req, res);
   });
 
   ytdlp.on("error", (err) => {
