@@ -764,7 +764,7 @@ function App() {
 
     searchTimeoutRef.current = setTimeout(() => {
       executeSearch(query);
-    }, 350);
+    }, 150);
 
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -790,20 +790,24 @@ function App() {
     executeSearch(query);
   };
 
-  const startRadio = async () => {
-    if (!currentSong) return;
+  const startRadio = async (baseSong = currentSong) => {
+    if (!baseSong) return;
     setIsRadioLoading(true);
     try {
-      const query = `${currentSong.channel} ${currentSong.title} mix`;
+      const query = `${baseSong.channel} ${baseSong.title}`;
       const response = await fetch(`${apiUrl}/search?q=${encodeURIComponent(query)}`);
       const data = await response.json();
       const results = data.results || [];
       if (results.length > 0) {
-        const related = results.filter((s) => s.videoId !== currentSong.videoId).slice(0, 15);
+        const related = results.filter((s) => s.videoId !== baseSong.videoId).slice(0, 15);
         if (related.length > 0) {
           if (repeatMode === 'one') setRepeatMode('all');
-          const newQueue = [...queue.slice(0, currentIndex + 1), ...related];
-          setQueue(newQueue);
+          setQueue(prevQueue => {
+             const baseIdx = prevQueue.findIndex(s => s.videoId === baseSong.videoId);
+             const insertIdx = baseIdx !== -1 ? baseIdx : currentIndex;
+             return [...prevQueue.slice(0, insertIdx + 1), ...related];
+          });
+          fetch(`${apiUrl}/prefetch/${related[0].videoId}`).catch(() => {});
         }
       }
     } catch (error) {
@@ -817,9 +821,8 @@ function App() {
     let newIndex = idx;
 
     if (idx === -1) {
-      const newQueue = [...queue, song];
-      newIndex = newQueue.length - 1;
-      setQueue(newQueue);
+      setQueue([song]);
+      newIndex = 0;
     }
 
     setCurrentIndex(newIndex);
@@ -831,7 +834,10 @@ function App() {
       audioRef.current.load();
       audioRef.current
         .play()
-        .then(() => setIsPlaying(true))
+        .then(() => {
+          setIsPlaying(true);
+          startRadio(song);
+        })
         .catch((err) => {
           console.error('Play error:', err);
           setIsPlaying(false);

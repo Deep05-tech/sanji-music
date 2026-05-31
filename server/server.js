@@ -7,6 +7,7 @@ const fs = require("fs");
 const http = require("http");
 const https = require("https");
 const db = require("./db");
+const ytSearch = require("yt-search");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -269,73 +270,64 @@ app.get("/search", async (req, res) => {
 
   console.log(`[SEARCH] Searching for: "${query}"`);
 
+  try {
+    const r = await ytSearch(query);
+    const videos = r.videos.slice(0, 15);
+    const results = videos.map(v => ({
+      title: v.title,
+      videoId: v.videoId,
+      thumbnail: v.thumbnail,
+      duration: v.timestamp,
+      durationSeconds: v.seconds,
+      channel: v.author ? v.author.name : "Unknown Artist"
+    }));
+    
+    console.log(`[SEARCH] Found ${results.length} results`);
+    const payload = { results };
+    setCachedSearch(query, payload);
+    res.json(payload);
+  } catch (err) {
+    console.error(`[SEARCH ERROR] ${err.message}`);
+    res.status(500).json({ error: "Search failed" });
+  }
+});
+
+app.get("/prefetch/:videoId", (req, res) => {
+  const videoId = req.params.videoId;
+  if (!videoId) return res.json({ error: "No videoId" });
+  
+  if (streamCache.has(videoId)) {
+    return res.json({ cached: true });
+  }
+
+  console.log(`[PREFETCH] Background extracting: ${videoId}`);
   const args = [
-    `ytsearch12:${query}`,
+    videoId,
     "--dump-json",
-    "--flat-playlist",
     "--no-warnings",
-    "--default-search", "ytsearch",
+    "-f", "bestaudio[ext=m4a]/bestaudio/best",
     "--extractor-args", "youtube:player_client=android,ios;player_skip=webpage",
     "--no-check-certificate",
-    "--js-runtimes", `node:${process.execPath}`,
     ...getCookiesArgs(),
   ];
 
   const ytdlp = spawn(ytDlpCmd, args);
-
   let stdout = "";
-  let stderr = "";
-
-  ytdlp.stdout.on("data", (data) => {
-    stdout += data.toString();
-  });
-
-  ytdlp.stderr.on("data", (data) => {
-    stderr += data.toString();
-  });
-
+  ytdlp.stdout.on("data", (data) => stdout += data.toString());
+  
   ytdlp.on("close", (code) => {
-    if (code !== 0) {
-      console.error(`[SEARCH ERROR] yt-dlp exited with code ${code}: ${stderr}`);
-      return res.status(500).json({ error: "Search failed", details: stderr });
-    }
-
-    try {
-      const results = stdout
-        .trim()
-        .split("\n")
-        .filter((line) => line.trim())
-        .map((line) => {
-          const data = JSON.parse(line);
-          return {
-            title: data.title || "Unknown Title",
-            videoId: data.id || data.url,
-            thumbnail:
-              data.thumbnails && data.thumbnails.length > 0
-                ? data.thumbnails[data.thumbnails.length - 1].url
-                : `https://i.ytimg.com/vi/${data.id}/hqdefault.jpg`,
-            duration: data.duration
-              ? formatDuration(data.duration)
-              : "Unknown",
-            durationSeconds: data.duration || 0,
-            channel: data.channel || data.uploader || "Unknown Artist",
-          };
-        });
-
-      console.log(`[SEARCH] Found ${results.length} results`);
-      const payload = { results };
-      setCachedSearch(query, payload);
-      res.json(payload);
-    } catch (err) {
-      console.error(`[SEARCH PARSE ERROR] ${err.message}`);
-      res.status(500).json({ error: "Failed to parse search results" });
+    if (code === 0) {
+      try {
+        const data = JSON.parse(stdout);
+        if (data.url) {
+          cacheStreamUrl(videoId, data.url);
+          console.log(`[PREFETCH] Cached URL for ${videoId}`);
+        }
+      } catch (err) {}
     }
   });
 
-  ytdlp.on("error", (err) => {
-    console.error(`[SEARCH SPAWN ERROR] ${err.message}`);
-    res.status(500).json({ error: "Failed to run yt-dlp. Is it installed?" });
-  });
+  res.json({ started: true });
 });
 
 function proxyStream(sourceUrl, req, res, _redirects) {
