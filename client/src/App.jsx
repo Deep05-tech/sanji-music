@@ -441,18 +441,6 @@ function App() {
     };
 
     loadHomeData();
-
-    // Pre-cache category card smart playlist queries
-    const commonQueries = [
-      ...CATEGORY_CARDS,
-      ...DEFAULT_PLAYLISTS.map((p) => p.query),
-    ];
-    for (const q of new Set(commonQueries)) {
-      if (!getSearchCache(q)) fetch(`${apiUrl}/search?q=${encodeURIComponent(q)}`)
-        .then((r) => r.json())
-        .then((d) => { if (d.results) setSearchCache(q, d.results); })
-        .catch(() => {});
-    }
   }, [apiUrl]);
 
   useEffect(() => {

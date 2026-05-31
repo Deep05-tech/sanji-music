@@ -8,6 +8,7 @@ const http = require("http");
 const https = require("https");
 const db = require("./db");
 const ytSearch = require("yt-search");
+const ytdl = require("@distube/ytdl-core");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -292,43 +293,6 @@ app.get("/search", async (req, res) => {
   }
 });
 
-app.get("/prefetch/:videoId", (req, res) => {
-  const videoId = req.params.videoId;
-  if (!videoId) return res.json({ error: "No videoId" });
-  
-  if (streamCache.has(videoId)) {
-    return res.json({ cached: true });
-  }
-
-  console.log(`[PREFETCH] Background extracting: ${videoId}`);
-  const args = [
-    videoId,
-    "--dump-json",
-    "--no-warnings",
-    "-f", "bestaudio[ext=m4a]/bestaudio/best",
-    "--extractor-args", "youtube:player_client=android,ios;player_skip=webpage",
-    "--no-check-certificate",
-    ...getCookiesArgs(),
-  ];
-
-  const ytdlp = spawn(ytDlpCmd, args);
-  let stdout = "";
-  ytdlp.stdout.on("data", (data) => stdout += data.toString());
-  
-  ytdlp.on("close", (code) => {
-    if (code === 0) {
-      try {
-        const data = JSON.parse(stdout);
-        if (data.url) {
-          cacheStreamUrl(videoId, data.url);
-          console.log(`[PREFETCH] Cached URL for ${videoId}`);
-        }
-      } catch (err) {}
-    }
-  });
-
-  res.json({ started: true });
-});
 
 function proxyStream(sourceUrl, req, res, _redirects) {
   const hops = _redirects || 0;
@@ -390,7 +354,7 @@ function proxyStream(sourceUrl, req, res, _redirects) {
   req.on("close", () => proxyReq.destroy());
 }
 
-app.get("/stream/:videoId", (req, res) => {
+app.get("/stream/:videoId", async (req, res) => {
   const { videoId } = req.params;
 
   const cachedUrl = getCachedStream(videoId);
@@ -401,44 +365,23 @@ app.get("/stream/:videoId", (req, res) => {
 
   console.log(`[STREAM] Resolving direct URL for: ${videoId}`);
 
-  const url = `https://www.youtube.com/watch?v=${videoId}`;
-
-  const ytdlp = spawn(ytDlpCmd, [
-    url,
-    "-f", "bestaudio/best",
-    "--get-url",
-    "--no-warnings",
-    "--no-playlist",
-    "--extractor-args", "youtube:player_client=android,web;player_skip=webpage",
-    "--no-check-certificate",
-    "--js-runtimes", `node:${process.execPath}`,
-    ...getCookiesArgs(),
-  ]);
-
-  let output = "";
-  ytdlp.stdout.on("data", (data) => { output += data.toString(); });
-  let errOutput = "";
-  ytdlp.stderr.on("data", (data) => { errOutput += data.toString(); });
-
-  ytdlp.on("close", (code) => {
-    const directUrl = output.trim();
-    if (code !== 0 || !directUrl) {
-      console.error(`[STREAM] yt-dlp failed (${code}): ${errOutput}`);
-      return res.status(500).json({ 
-        error: "Failed to resolve stream URL", 
-        code, 
-        details: errOutput.trim() 
-      });
+  try {
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    const info = await ytdl.getInfo(url);
+    const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
+    
+    if (!format || !format.url) {
+      throw new Error("No suitable audio format found");
     }
+
+    const directUrl = format.url;
     console.log(`[STREAM] Proxying ${videoId} -> ${directUrl.slice(0, 60)}...`);
     setCachedStream(videoId, directUrl);
     proxyStream(directUrl, req, res);
-  });
-
-  ytdlp.on("error", (err) => {
-    console.error(`[STREAM] Spawn error: ${err.message}`);
-    if (!res.headersSent) res.status(500).json({ error: "Stream resolution failed" });
-  });
+  } catch (err) {
+    console.error(`[STREAM] Resolution failed: ${err.message}`);
+    if (!res.headersSent) res.status(500).json({ error: "Stream resolution failed", details: err.message });
+  }
 });
 
 
