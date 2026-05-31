@@ -347,6 +347,7 @@ function App() {
 
   const audioRef = useRef(null);
   const searchTimeoutRef = useRef(null);
+  const searchAbortControllerRef = useRef(null);
   const currentSong = currentIndex >= 0 && currentIndex < queue.length ? queue[currentIndex] : null;
   const smokeParticles = useMemo(() => makeParticles(34, 'smoke-particle', 16, 18), []);
   const emberParticles = useMemo(() => makeParticles(22, 'ember', 8, 12), []);
@@ -738,18 +739,31 @@ function App() {
     if (cached) {
       setSearchResults(cached);
       setIsSearching(false);
+      return;
     }
-    if (!cached) setIsSearching(true);
+    
+    if (searchAbortControllerRef.current) {
+      searchAbortControllerRef.current.abort();
+    }
+    searchAbortControllerRef.current = new AbortController();
+
+    setIsSearching(true);
     try {
-      const response = await fetch(`${apiUrl}/search?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`${apiUrl}/search?q=${encodeURIComponent(query)}`, {
+        signal: searchAbortControllerRef.current.signal
+      });
       const data = await response.json();
       const results = data.results || [];
       setSearchResults(results);
       setSearchCache(query, results);
     } catch (error) {
-      console.error('Search failed:', error);
+      if (error.name !== 'AbortError') {
+        console.error('Search failed:', error);
+      }
     } finally {
-      setIsSearching(false);
+      if (!searchAbortControllerRef.current?.signal.aborted) {
+        setIsSearching(false);
+      }
     }
   }, [apiUrl]);
 
@@ -764,7 +778,7 @@ function App() {
 
     searchTimeoutRef.current = setTimeout(() => {
       executeSearch(query);
-    }, 150);
+    }, 500);
 
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -807,7 +821,6 @@ function App() {
              const insertIdx = baseIdx !== -1 ? baseIdx : currentIndex;
              return [...prevQueue.slice(0, insertIdx + 1), ...related];
           });
-          fetch(`${apiUrl}/prefetch/${related[0].videoId}`).catch(() => {});
         }
       }
     } catch (error) {
@@ -819,10 +832,12 @@ function App() {
 
   const playSong = (song, idx = -1) => {
     let newIndex = idx;
+    let currentQueueLen = queue.length;
 
     if (idx === -1) {
       setQueue([song]);
       newIndex = 0;
+      currentQueueLen = 1;
     }
 
     setCurrentIndex(newIndex);
@@ -836,7 +851,9 @@ function App() {
         .play()
         .then(() => {
           setIsPlaying(true);
-          startRadio(song);
+          if (currentQueueLen - newIndex <= 2) {
+            startRadio(song);
+          }
         })
         .catch((err) => {
           console.error('Play error:', err);
