@@ -37,6 +37,33 @@ const STORAGE_KEY = 'sanji_recent';
 const LEGACY_STORAGE_KEY = 'santoryu_recent';
 const LIKED_STORAGE_KEY = 'sanji_liked_songs';
 const PLAYLIST_STORAGE_KEY = 'sanji_playlists';
+const SEARCH_CACHE_KEY = 'sanji_search_cache';
+const SEARCH_CACHE_TTL = 15 * 60 * 1000;
+
+function getSearchCache(query) {
+  try {
+    const raw = localStorage.getItem(SEARCH_CACHE_KEY);
+    if (!raw) return null;
+    const cache = JSON.parse(raw);
+    const entry = cache[query.toLowerCase().trim()];
+    if (!entry) return null;
+    if (Date.now() - entry.ts > SEARCH_CACHE_TTL) {
+      delete cache[query.toLowerCase().trim()];
+      localStorage.setItem(SEARCH_CACHE_KEY, JSON.stringify(cache));
+      return null;
+    }
+    return entry.results;
+  } catch { return null; }
+}
+
+function setSearchCache(query, results) {
+  try {
+    const raw = localStorage.getItem(SEARCH_CACHE_KEY) || '{}';
+    const cache = JSON.parse(raw);
+    cache[query.toLowerCase().trim()] = { results, ts: Date.now() };
+    localStorage.setItem(SEARCH_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+}
 
 const SECTION_QUERIES = {
   recentlyServed: 'Global Top Songs 2024',
@@ -386,9 +413,13 @@ function App() {
     const loadHomeData = async () => {
       try {
         const fetchSection = async (query) => {
+          const cached = getSearchCache(query);
+          if (cached) return cached;
           const res = await fetch(`${apiUrl}/search?q=${encodeURIComponent(query)}`);
           const data = await res.json();
-          return data.results || [];
+          const results = data.results || [];
+          setSearchCache(query, results);
+          return results;
         };
 
         const [recentlyServed, specials, freshKitchen, recommendation] = await Promise.all([
@@ -405,6 +436,18 @@ function App() {
     };
 
     loadHomeData();
+
+    // Pre-cache category card smart playlist queries
+    const commonQueries = [
+      ...CATEGORY_CARDS,
+      ...DEFAULT_PLAYLISTS.map((p) => p.query),
+    ];
+    for (const q of new Set(commonQueries)) {
+      if (!getSearchCache(q)) fetch(`${apiUrl}/search?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d) => { if (d.results) setSearchCache(q, d.results); })
+        .catch(() => {});
+    }
   }, [apiUrl]);
 
   useEffect(() => {
@@ -685,11 +728,18 @@ function App() {
   };
 
   const executeSearch = useCallback(async (query) => {
-    setIsSearching(true);
+    const cached = getSearchCache(query);
+    if (cached) {
+      setSearchResults(cached);
+      setIsSearching(false);
+    }
+    if (!cached) setIsSearching(true);
     try {
       const response = await fetch(`${apiUrl}/search?q=${encodeURIComponent(query)}`);
       const data = await response.json();
-      setSearchResults(data.results || []);
+      const results = data.results || [];
+      setSearchResults(results);
+      setSearchCache(query, results);
     } catch (error) {
       console.error('Search failed:', error);
     } finally {
