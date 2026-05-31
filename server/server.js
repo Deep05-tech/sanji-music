@@ -362,6 +362,7 @@ app.get("/search", async (req, res) => {
     "--default-search", "ytsearch",
     "--extractor-args", "youtube:player_client=android,ios;player_skip=webpage",
     "--no-check-certificate",
+    "--js-runtimes", `node:${process.execPath}`,
     ...getCookiesArgs(),
   ];
 
@@ -443,6 +444,7 @@ app.get("/stream/:videoId", (req, res) => {
     "--no-playlist",
     "--extractor-args", "youtube:player_client=mweb,tv;player_skip=webpage",
     "--no-check-certificate",
+    "--js-runtimes", `node:${process.execPath}`,
     ...getCookiesArgs(),
   ]);
 
@@ -488,6 +490,7 @@ app.get("/debug-ytdlp", (req, res) => {
       "-v",
       "--no-playlist",
       "--no-check-certificate",
+      "--js-runtimes", `node:${process.execPath}`,
     ];
     if (spoofClient !== "default") {
       args.push("--extractor-args", `youtube:player_client=${spoofClient}${req.query.skipweb === "false" ? "" : ";player_skip=webpage"}`);
@@ -580,6 +583,7 @@ app.get("/metadata/:videoId", (req, res) => {
     "--dump-json",
     "--no-warnings",
     "--no-playlist",
+    "--js-runtimes", `node:${process.execPath}`,
   ]);
 
   let stdout = "";
