@@ -383,16 +383,53 @@ app.get("/stream/:videoId", async (req, res) => {
 
   try {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    const info = await play.video_info(url);
-    
-    let format = info.format.filter(f => f.hasAudio && !f.hasVideo).sort((a,b) => b.audioBitrate - a.audioBitrate)[0];
-    if (!format) format = info.format.find(f => f.hasAudio);
-    
-    if (!format || !format.url) {
-      throw new Error("No suitable audio format found");
+    let directUrl = null;
+
+    try {
+      const info = await play.video_info(url);
+      let format = info.format.filter(f => f.hasAudio && !f.hasVideo).sort((a,b) => b.audioBitrate - a.audioBitrate)[0];
+      if (!format) format = info.format.find(f => f.hasAudio);
+      if (format && format.url) {
+        directUrl = format.url;
+      } else {
+        throw new Error("No suitable audio format found in play-dl");
+      }
+    } catch (playErr) {
+      console.warn(`[STREAM] play-dl failed for ${videoId} (${playErr.message}), falling back to yt-dlp...`);
+      // Fallback to yt-dlp (which supports cookies natively to bypass 429)
+      directUrl = await new Promise((resolve, reject) => {
+        const args = [
+          url,
+          "-g",
+          "-f", "bestaudio/best",
+          "--no-playlist",
+          "--no-check-certificate",
+          "--js-runtimes", `node:${process.execPath}`
+        ];
+        if (fs.existsSync(COOKIES_PATH)) {
+          args.push("--cookies", COOKIES_PATH);
+        }
+        
+        const ytdlp = spawn(ytDlpCmd, args);
+        let stdout = "";
+        let stderr = "";
+        ytdlp.stdout.on("data", data => stdout += data.toString());
+        ytdlp.stderr.on("data", data => stderr += data.toString());
+        
+        ytdlp.on("close", code => {
+          if (code === 0 && stdout.trim()) {
+            resolve(stdout.trim());
+          } else {
+            reject(new Error(`yt-dlp error: ${stderr.trim()}`));
+          }
+        });
+        
+        ytdlp.on("error", err => reject(err));
+      });
     }
 
-    const directUrl = format.url;
+    if (!directUrl) throw new Error("Failed to resolve any direct URL");
+
     console.log(`[STREAM] Proxying ${videoId} -> ${directUrl.slice(0, 60)}...`);
     setCachedStream(videoId, directUrl);
     proxyStream(directUrl, req, res);
