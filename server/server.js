@@ -8,6 +8,7 @@ const http = require("http");
 const https = require("https");
 const db = require("./db");
 const play = require("play-dl");
+const ytSearch = require("yt-search");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -271,15 +272,32 @@ app.get("/search", async (req, res) => {
   console.log(`[SEARCH] Searching for: "${query}"`);
 
   try {
-    const videos = await play.search(query, { limit: 15, source: { youtube: "video" } });
-    const results = videos.map(v => ({
-      title: v.title,
-      videoId: v.id,
-      thumbnail: v.thumbnails[0]?.url || "",
-      duration: v.durationRaw,
-      durationSeconds: v.durationInSec,
-      channel: v.channel?.name || "Unknown Artist"
-    }));
+    let videos = [];
+    try {
+      videos = await play.search(query, { limit: 15, source: { youtube: "video" } });
+    } catch (e) {
+      console.warn(`[SEARCH] play-dl failed for "${query}", falling back to yt-search`);
+      const r = await ytSearch(query);
+      videos = r.videos.slice(0, 15);
+    }
+    
+    const results = videos.map(v => {
+      // Handle both play-dl and yt-search response formats
+      const videoId = v.id || v.videoId;
+      const thumbnail = (v.thumbnails && v.thumbnails.length > 0) ? v.thumbnails[0].url : (v.thumbnail || "");
+      const durationRaw = v.durationRaw || v.timestamp;
+      const durationSec = v.durationInSec || v.seconds;
+      const channelName = (v.channel && v.channel.name) ? v.channel.name : (v.author && v.author.name ? v.author.name : "Unknown Artist");
+
+      return {
+        title: v.title,
+        videoId: videoId,
+        thumbnail: thumbnail,
+        duration: durationRaw,
+        durationSeconds: durationSec,
+        channel: channelName
+      };
+    });
     
     console.log(`[SEARCH] Found ${results.length} results`);
     const payload = { results };
