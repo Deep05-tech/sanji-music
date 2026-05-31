@@ -485,7 +485,7 @@ app.get("/debug-ytdlp", (req, res) => {
     const format = req.query.format || "bestaudio/best";
     const args = [
       `https://www.youtube.com/watch?v=${videoId}`,
-      "--no-warnings",
+      "-v",
       "--no-playlist",
       "--no-check-certificate",
     ];
