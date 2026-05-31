@@ -7,8 +7,7 @@ const fs = require("fs");
 const http = require("http");
 const https = require("https");
 const db = require("./db");
-const ytSearch = require("yt-search");
-const ytdl = require("@distube/ytdl-core");
+const play = require("play-dl");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -272,15 +271,14 @@ app.get("/search", async (req, res) => {
   console.log(`[SEARCH] Searching for: "${query}"`);
 
   try {
-    const r = await ytSearch(query);
-    const videos = r.videos.slice(0, 15);
+    const videos = await play.search(query, { limit: 15 });
     const results = videos.map(v => ({
       title: v.title,
-      videoId: v.videoId,
-      thumbnail: v.thumbnail,
-      duration: v.timestamp,
-      durationSeconds: v.seconds,
-      channel: v.author ? v.author.name : "Unknown Artist"
+      videoId: v.id,
+      thumbnail: v.thumbnails[0]?.url || "",
+      duration: v.durationRaw,
+      durationSeconds: v.durationInSec,
+      channel: v.channel?.name || "Unknown Artist"
     }));
     
     console.log(`[SEARCH] Found ${results.length} results`);
@@ -367,8 +365,10 @@ app.get("/stream/:videoId", async (req, res) => {
 
   try {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    const info = await ytdl.getInfo(url);
-    const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
+    const info = await play.video_info(url);
+    
+    let format = info.format.filter(f => f.hasAudio && !f.hasVideo).sort((a,b) => b.audioBitrate - a.audioBitrate)[0];
+    if (!format) format = info.format.find(f => f.hasAudio);
     
     if (!format || !format.url) {
       throw new Error("No suitable audio format found");
