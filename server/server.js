@@ -110,91 +110,6 @@ function setCachedStream(videoId, url) {
   streamCache.set(videoId, { url, ts: Date.now() });
 }
 
-const CURATED_HOME_SECTIONS = {
-  "global top songs 2024": [
-    { title: "Overtaken (Luffy's Theme OST)", videoId: "8A-q3TM8kDM", thumbnail: "https://i.ytimg.com/vi/8A-q3TM8kDM/hqdefault.jpg", duration: "1:56", durationSeconds: 116, channel: "Kohei Tanaka" },
-    { title: "Binks' Sake (Straw Hat Version)", videoId: "3gT41s_rIhc", thumbnail: "https://i.ytimg.com/vi/3gT41s_rIhc/hqdefault.jpg", duration: "3:24", durationSeconds: 204, channel: "Straw Hat Pirates" },
-    { title: "We Are! (One Piece Theme Song)", videoId: "HR05p8W1a0I", thumbnail: "https://i.ytimg.com/vi/HR05p8W1a0I/hqdefault.jpg", duration: "4:00", durationSeconds: 240, channel: "Hiroshi Kitadani" },
-    { title: "Sanji's Theme (Baratie Restaurant)", videoId: "PzE5JIoH4Lw", thumbnail: "https://i.ytimg.com/vi/PzE5JIoH4Lw/hqdefault.jpg", duration: "2:46", durationSeconds: 166, channel: "Kohei Tanaka" },
-    { title: "The Very, Very, Very Strongest (OST)", videoId: "4J7K3yacig4", thumbnail: "https://i.ytimg.com/vi/4J7K3yacig4/hqdefault.jpg", duration: "1:44", durationSeconds: 104, channel: "Kohei Tanaka" },
-    { title: "Drums of Liberation (Gear 5 Ost)", videoId: "t7D-9V3rY7A", thumbnail: "https://i.ytimg.com/vi/t7D-9V3rY7A/hqdefault.jpg", duration: "4:12", durationSeconds: 252, channel: "Samuel Kim Music" }
-  ],
-  "underground jazz lounge music": [
-    { title: "Binks' Sake - Classy Jazz Cafe Cover", videoId: "sN_X0LgqM6M", thumbnail: "https://i.ytimg.com/vi/sN_X0LgqM6M/hqdefault.jpg", duration: "3:12", durationSeconds: 192, channel: "Baratie Cafe Jazz Band" },
-    { title: "Autumn Leaves (Late Night Jazz Standard)", videoId: "r-Z811776gQ", thumbnail: "https://i.ytimg.com/vi/r-Z811776gQ/hqdefault.jpg", duration: "6:25", durationSeconds: 385, channel: "Cigarette Smoke Lounge" },
-    { title: "Fly Me to the Moon (Cigarette Jazz Mix)", videoId: "mQR0bXO_yI8", thumbnail: "https://i.ytimg.com/vi/mQR0bXO_yI8/hqdefault.jpg", duration: "2:30", durationSeconds: 150, channel: "Frank Sinatra" },
-    { title: "Take Five (Classic Baratie Jazz Session)", videoId: "vmDDOFXSgAs", thumbnail: "https://i.ytimg.com/vi/vmDDOFXSgAs/hqdefault.jpg", duration: "5:24", durationSeconds: 324, channel: "Dave Brubeck" },
-    { title: "My Funny Valentine (Midnight Trumpet)", videoId: "jvXywhJpOKs", thumbnail: "https://i.ytimg.com/vi/jvXywhJpOKs/hqdefault.jpg", duration: "6:00", durationSeconds: 360, channel: "Chet Baker" },
-    { title: "Blue In Green (Elegant Lounge Jazz)", videoId: "PoPL7BExSOU", thumbnail: "https://i.ytimg.com/vi/PoPL7BExSOU/hqdefault.jpg", duration: "5:38", durationSeconds: 338, channel: "Miles Davis" }
-  ],
-  "new music releases": [
-    { title: "Luffy Gear 5 Theme (Epic Orchestral Remix)", videoId: "t7D-9V3rY7A", thumbnail: "https://i.ytimg.com/vi/t7D-9V3rY7A/hqdefault.jpg", duration: "4:12", durationSeconds: 252, channel: "Samuel Kim Music" },
-    { title: "Baratie Bistro - Accordion French Waltz", videoId: "y6120Q5M03A", thumbnail: "https://i.ytimg.com/vi/y6120Q5M03A/hqdefault.jpg", duration: "3:30", durationSeconds: 210, channel: "Chef Sanji's Kitchen" },
-    { title: "All Blue Ocean Chill Beats", videoId: "jfKfPfyJRdk", thumbnail: "https://i.ytimg.com/vi/jfKfPfyJRdk/hqdefault.jpg", duration: "4:15", durationSeconds: 255, channel: "Lofi Girl" },
-    { title: "We Go! (Classy Acoustic Cover)", videoId: "f82yR3vN58A", thumbnail: "https://i.ytimg.com/vi/f82yR3vN58A/hqdefault.jpg", duration: "3:45", durationSeconds: 225, channel: "Straw Hat Acoustic" }
-  ],
-  "lofi dinner jazz beats": [
-    { title: "Sanji Cooking Lofi - Chill Baratie Beats", videoId: "dQw4w9WgXcQ", thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", duration: "3:32", durationSeconds: 212, channel: "Baratie Chef Lofi" },
-    { title: "Late Night Cigarette Smoke & Jazz Ambient", videoId: "54n9EtYp_0o", thumbnail: "https://i.ytimg.com/vi/54n9EtYp_0o/hqdefault.jpg", duration: "4:00:00", durationSeconds: 14400, channel: "Lofi Coffee Shop" },
-    { title: "All Blue Sea breeze Relaxing Lofi", videoId: "2tK_MvP9x4s", thumbnail: "https://i.ytimg.com/vi/2tK_MvP9x4s/hqdefault.jpg", duration: "2:40", durationSeconds: 160, channel: "Grand Line Chill" },
-    { title: "Binks' Sake (Straw Hat Lofi Sleep Mix)", videoId: "Qz8tS5d_61A", thumbnail: "https://i.ytimg.com/vi/Qz8tS5d_61A/hqdefault.jpg", duration: "3:05", durationSeconds: 185, channel: "Lofi Straw Hat" }
-  ],
-  "ocean jazz chill music": [
-    { title: "All Blue Deep Sea Lounge Beats", videoId: "jfKfPfyJRdk", thumbnail: "https://i.ytimg.com/vi/jfKfPfyJRdk/hqdefault.jpg", duration: "4:15", durationSeconds: 255, channel: "Lofi Girl" },
-    { title: "Binks' Sake (Sailing Accordion Cover)", videoId: "y6120Q5M03A", thumbnail: "https://i.ytimg.com/vi/y6120Q5M03A/hqdefault.jpg", duration: "3:30", durationSeconds: 210, channel: "Grand Line Orchestra" },
-    { title: "Ocean Breeze Chill Jazz Piano", videoId: "2tK_MvP9x4s", thumbnail: "https://i.ytimg.com/vi/2tK_MvP9x4s/hqdefault.jpg", duration: "2:40", durationSeconds: 160, channel: "Sea Breeze Jazz" },
-    { title: "Straw Hat Campfire Acoustic Chill", videoId: "f82yR3vN58A", thumbnail: "https://i.ytimg.com/vi/f82yR3vN58A/hqdefault.jpg", duration: "3:45", durationSeconds: 225, channel: "Starlight Acoustic" }
-  ],
-  "romantic dinner jazz": [
-    { title: "My Funny Valentine (Warm Candlelight Trumpet)", videoId: "jvXywhJpOKs", thumbnail: "https://i.ytimg.com/vi/jvXywhJpOKs/hqdefault.jpg", duration: "6:00", durationSeconds: 360, channel: "Chet Baker" },
-    { title: "Autumn Leaves (Chamber Quartet Live)", videoId: "r-Z811776gQ", thumbnail: "https://i.ytimg.com/vi/r-Z811776gQ/hqdefault.jpg", duration: "6:25", durationSeconds: 385, channel: "Elegant Strings" },
-    { title: "Fly Me to the Moon (Slow Lounge Duo)", videoId: "mQR0bXO_yI8", thumbnail: "https://i.ytimg.com/vi/mQR0bXO_yI8/hqdefault.jpg", duration: "2:30", durationSeconds: 150, channel: "Baratie Duo" }
-  ],
-  "high energy funk rock": [
-    { title: "Overtaken (Epic Orchestral Rock)", videoId: "8A-q3TM8kDM", thumbnail: "https://i.ytimg.com/vi/8A-q3TM8kDM/hqdefault.jpg", duration: "1:56", durationSeconds: 116, channel: "Epic Symphony" },
-    { title: "Luffy Gear 5 - Drums of Liberation (Funk Rock)", videoId: "t7D-9V3rY7A", thumbnail: "https://i.ytimg.com/vi/t7D-9V3rY7A/hqdefault.jpg", duration: "4:12", durationSeconds: 252, channel: "Samuel Kim Music" },
-    { title: "We Are! (Power Metal Version)", videoId: "HR05p8W1a0I", thumbnail: "https://i.ytimg.com/vi/HR05p8W1a0I/hqdefault.jpg", duration: "4:00", durationSeconds: 240, channel: "Grand Line Metal" }
-  ],
-  "underground jazz bar": [
-    { title: "Take Five (Classic Club Quintet)", videoId: "vmDDOFXSgAs", thumbnail: "https://i.ytimg.com/vi/vmDDOFXSgAs/hqdefault.jpg", duration: "5:24", durationSeconds: 324, channel: "Dave Brubeck" },
-    { title: "Blue In Green (Quiet Bar Session)", videoId: "PoPL7BExSOU", thumbnail: "https://i.ytimg.com/vi/PoPL7BExSOU/hqdefault.jpg", duration: "5:38", durationSeconds: 338, channel: "Miles Davis" }
-  ],
-  "focus cooking playlist": [
-    { title: "Sanji Cooking Lofi - Focus Beat Mix", videoId: "dQw4w9WgXcQ", thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", duration: "3:32", durationSeconds: 212, channel: "Baratie Kitchen Lofi" },
-    { title: "Late Night Cigarette Smoke & Writing Jazz", videoId: "54n9EtYp_0o", thumbnail: "https://i.ytimg.com/vi/54n9EtYp_0o/hqdefault.jpg", duration: "4:00:00", durationSeconds: 14400, channel: "Lofi Coffee Shop" }
-  ],
-  "jazz bar": [
-    { title: "Take Five (Classic Jazz)", videoId: "vmDDOFXSgAs", thumbnail: "https://i.ytimg.com/vi/vmDDOFXSgAs/hqdefault.jpg", duration: "5:24", durationSeconds: 324, channel: "Dave Brubeck" },
-    { title: "Blue In Green (Classic Trumpet)", videoId: "PoPL7BExSOU", thumbnail: "https://i.ytimg.com/vi/PoPL7BExSOU/hqdefault.jpg", duration: "5:38", durationSeconds: 338, channel: "Miles Davis" },
-    { title: "My Funny Valentine (Smooth Vocal)", videoId: "jvXywhJpOKs", thumbnail: "https://i.ytimg.com/vi/jvXywhJpOKs/hqdefault.jpg", duration: "6:00", durationSeconds: 360, channel: "Chet Baker" }
-  ],
-  "fine dining": [
-    { title: "Baratie Bistro - Accordion French Waltz", videoId: "y6120Q5M03A", thumbnail: "https://i.ytimg.com/vi/y6120Q5M03A/hqdefault.jpg", duration: "3:30", durationSeconds: 210, channel: "Chef Sanji's Kitchen" },
-    { title: "Autumn Leaves (Bossa Nova Mix)", videoId: "r-Z811776gQ", thumbnail: "https://i.ytimg.com/vi/r-Z811776gQ/hqdefault.jpg", duration: "6:25", durationSeconds: 385, channel: "Bistro Quartet" }
-  ],
-  "late night": [
-    { title: "Late Night Cigarette Smoke & Jazz Ambient", videoId: "54n9EtYp_0o", thumbnail: "https://i.ytimg.com/vi/54n9EtYp_0o/hqdefault.jpg", duration: "4:00:00", durationSeconds: 14400, channel: "Lofi Coffee Shop" },
-    { title: "Binks' Sake (Violin Night Cover)", videoId: "sN_X0LgqM6M", thumbnail: "https://i.ytimg.com/vi/sN_X0LgqM6M/hqdefault.jpg", duration: "3:12", durationSeconds: 192, channel: "Baratie Cafe Jazz Band" }
-  ],
-  "acoustic": [
-    { title: "We Go! (Classy Acoustic Cover)", videoId: "f82yR3vN58A", thumbnail: "https://i.ytimg.com/vi/f82yR3vN58A/hqdefault.jpg", duration: "3:45", durationSeconds: 225, channel: "Straw Hat Acoustic" },
-    { title: "Binks' Sake (Sailing Accordion Cover)", videoId: "y6120Q5M03A", thumbnail: "https://i.ytimg.com/vi/y6120Q5M03A/hqdefault.jpg", duration: "3:30", durationSeconds: 210, channel: "Grand Line Orchestra" }
-  ],
-  "chef focus": [
-    { title: "Sanji Cooking Lofi - Chill Baratie Beats", videoId: "dQw4w9WgXcQ", thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", duration: "3:32", durationSeconds: 212, channel: "Baratie Chef Lofi" }
-  ],
-  "soul": [
-    { title: "Binks' Sake (Straw Hat Version)", videoId: "3gT41s_rIhc", thumbnail: "https://i.ytimg.com/vi/3gT41s_rIhc/hqdefault.jpg", duration: "3:24", durationSeconds: 204, channel: "Straw Hat Pirates" }
-  ],
-  "all blue": [
-    { title: "All Blue Ocean Chill Beats", videoId: "jfKfPfyJRdk", thumbnail: "https://i.ytimg.com/vi/jfKfPfyJRdk/hqdefault.jpg", duration: "4:15", durationSeconds: 255, channel: "Lofi Girl" },
-    { title: "Ocean Breeze Chill Jazz Piano", videoId: "2tK_MvP9x4s", thumbnail: "https://i.ytimg.com/vi/2tK_MvP9x4s/hqdefault.jpg", duration: "2:40", durationSeconds: 160, channel: "Sea Breeze Jazz" }
-  ],
-  "candlelight": [
-    { title: "My Funny Valentine (Warm Candlelight Trumpet)", videoId: "jvXywhJpOKs", thumbnail: "https://i.ytimg.com/vi/jvXywhJpOKs/hqdefault.jpg", duration: "6:00", durationSeconds: 360, channel: "Chet Baker" },
-    { title: "Fly Me to the Moon (Slow Lounge Duo)", videoId: "mQR0bXO_yI8", thumbnail: "https://i.ytimg.com/vi/mQR0bXO_yI8/hqdefault.jpg", duration: "2:30", durationSeconds: 150, channel: "Baratie Duo" }
-  ]
-};
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -343,10 +258,8 @@ app.get("/search", async (req, res) => {
   }
 
   const cleanQuery = query.toLowerCase().trim();
-  if (CURATED_HOME_SECTIONS[cleanQuery]) {
-    console.log(`[SEARCH] Curated query hit for: "${query}"`);
-    return res.json({ results: CURATED_HOME_SECTIONS[cleanQuery] });
-  }
+
+
 
   const cached = getCachedSearch(query);
   if (cached) {

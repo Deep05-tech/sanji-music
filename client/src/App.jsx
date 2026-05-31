@@ -69,9 +69,9 @@ function setSearchCache(query, results) {
 
 const SECTION_QUERIES = {
   recentlyServed: 'Global Top Songs 2024',
-  specials: 'Underground jazz lounge music',
-  freshKitchen: 'New Music Releases',
-  recommendation: 'Lofi dinner jazz beats',
+  specials: 'India Top 50 Trending Music',
+  freshKitchen: 'International Hit Songs 2024',
+  recommendation: 'Latest Trending Songs',
 };
 
 const CATEGORY_CARDS = [
@@ -1126,15 +1126,15 @@ function App() {
                   </Section>
                 )}
 
-                <Section label="Trending Tonight" title="Trending">
+                <Section label="Trending Tonight" title="Trending in India">
                   {renderCards(homeData.specials, 'Sharpening the knives for tonight.')}
                 </Section>
 
-                <Section label="Chef's Specials" title="Picked for You">
+                <Section label="Chef's Specials" title="International Hits">
                   {renderCards(homeData.freshKitchen, 'Fresh dishes are still on the pass.')}
                 </Section>
 
-                <Section label="Chef's Recommendation" title="Recommended">
+                <Section label="Chef's Recommendation" title="New Releases">
                   {renderCards(homeData.recommendation, 'The chef is tasting the sauce.')}
                 </Section>
               </>
