@@ -271,7 +271,7 @@ app.get("/search", async (req, res) => {
   console.log(`[SEARCH] Searching for: "${query}"`);
 
   try {
-    const videos = await play.search(query, { limit: 15 });
+    const videos = await play.search(query, { limit: 15, source: { youtube: "video" } });
     const results = videos.map(v => ({
       title: v.title,
       videoId: v.id,
